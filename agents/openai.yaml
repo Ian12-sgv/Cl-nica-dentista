@@ -1,0 +1,4 @@
+interface:
+  display_name: "Gestor Producto Proyecto"
+  short_description: "Convierte ideas en MVP y backlog"
+  default_prompt: "Use $gestor-producto-proyecto para convertir mi idea de software en MVP, roadmap, backlog, decisiones y plan tecnico."

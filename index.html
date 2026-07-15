@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Consultorio Dental</title>
+    <link rel="stylesheet" href="styles.css?v=20260715-32" />
+  </head>
+  <body>
+    <div class="app-shell" id="appShell" data-view="registro">
+      <header class="navbar">
+        <div class="brand">
+          <span class="brand-mark">D</span>
+          <div>
+            <strong>Consultorio Dental</strong>
+          </div>
+        </div>
+
+        <nav class="nav" aria-label="Vistas principales">
+          <button class="nav-link active" data-view="registro">Registro</button>
+          <button class="nav-link" data-view="historial">Historial</button>
+          <button class="nav-link" data-view="balance">Balance</button>
+          <button class="nav-link" data-view="porcentajes">Porcentajes</button>
+        </nav>
+      </header>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">SPA clinica</p>
+            <h1 id="viewTitle">Registro Paciente</h1>
+          </div>
+          <p id="statusText">Datos guardados localmente en este navegador.</p>
+        </header>
+
+        <section id="registro" class="view active">
+          <form id="patientForm" class="form-grid">
+            <section class="panel full">
+              <h2>Datos del paciente</h2>
+              <div class="grid two">
+                <label>Nombre Completo<input name="name" required /></label>
+                <label>Edad<input name="age" type="number" min="0" required /></label>
+                <label>Fecha<input name="date" type="date" required /></label>
+                <label>Fecha de nacimiento<input name="birthDate" type="date" /></label>
+                <label>Cedula<input name="idNumber" required /></label>
+                <label>Telefono<input name="phone" /></label>
+                <label>Telefono auxiliar<input name="secondaryPhone" /></label>
+                <label>Grupo sanguineo<input name="bloodGroup" placeholder="Ej. O+, A-, AB+" /></label>
+                <label class="wide">Direccion<input name="address" /></label>
+              </div>
+            </section>
+
+            <section class="panel full clinical-card">
+              <h2>Antecedentes</h2>
+              <div class="grid antecedent-grid">
+                <label>APP (ANTECEDENTES PATOLOGICOS PERSONALES)<textarea name="app" rows="3"></textarea></label>
+                <label>APF (ANTECEDENTES PATOLOGICOS FAMILIARES)<textarea name="apf" rows="3"></textarea></label>
+                <label>AH (ANTECEDENTES HEMORRAGICOS)<textarea name="ah" rows="3"></textarea></label>
+                <label>RM (REACCION A MEDICAMENTOS)<textarea name="rm" rows="3"></textarea></label>
+                <label class="wide">HABITOS<textarea name="habits" rows="3"></textarea></label>
+                <label class="wide">EXAMEN BUCAL<textarea name="oralExam" rows="4"></textarea></label>
+              </div>
+            </section>
+
+            <section class="panel full clinical-card">
+              <div class="section-head odontogram-head">
+                <h2>Odontodiagrama</h2>
+                <div class="odontogram-tools">
+                  <span>Color:</span>
+                  <div class="color-tools" aria-label="Color seleccionado">
+                    <button type="button" class="color-option red active" data-color="red"><span></span>Rojo</button>
+                    <button type="button" class="color-option blue" data-color="blue"><span></span>Azul</button>
+                  </div>
+                  <small>Click en una seccion para pintarla - click de nuevo para borrarla</small>
+                </div>
+              </div>
+              <div id="odontogram" class="odontogram" aria-label="Odontodiagrama interactivo"></div>
+              <input type="hidden" name="odontogram" id="odontogramInput" />
+            </section>
+
+            <section class="panel full">
+              <div class="section-head">
+                <h2>Plan de tratamiento</h2>
+                <button type="button" id="addTreatment" class="ghost-button">Agregar tratamiento</button>
+              </div>
+              <div id="treatmentList" class="treatment-list"></div>
+              <div class="total-line">
+                <span>Total estimado</span>
+                <strong id="treatmentTotal">$0.00</strong>
+              </div>
+            </section>
+
+            <div class="actions full">
+              <button type="reset" class="ghost-button">Limpiar</button>
+              <button type="submit" class="primary-button">Guardar paciente</button>
+            </div>
+          </form>
+        </section>
+
+        <section id="historial" class="view">
+          <div class="history-page">
+            <div id="historyListView">
+              <div class="history-title">
+                <h1>Historial</h1>
+                <p>Busca por nombre o cedula.</p>
+              </div>
+
+              <label class="history-search">
+                <span aria-hidden="true">⌕</span>
+                <input id="patientSearch" placeholder="Buscar paciente..." />
+              </label>
+
+              <div id="patientResults" class="results history-results"></div>
+            </div>
+
+            <section id="historyDetailView" class="history-detail" hidden>
+              <div id="patientProfile" class="empty-state compact">
+                Selecciona un paciente para ver su perfil completo y evolucion.
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="balance" class="view">
+          <div class="finance-page">
+            <header class="finance-header">
+              <div>
+                <h1>Balance Financiero</h1>
+                <p>Ingresos y egresos · USD / VES</p>
+              </div>
+              <div class="finance-tabs">
+                <button type="button" class="finance-filter active" data-filter="biweekly">Quincenal</button>
+                <button type="button" class="finance-filter" data-filter="monthly">Mensual</button>
+              </div>
+            </header>
+
+            <section class="finance-summary-cards">
+              <article class="finance-card">
+                <span class="finance-icon income">↓</span>
+                <div class="finance-card-values">
+                  <span>Ingresos</span>
+                  <div><small>USD</small><strong id="incomeUsd">$0.00</strong></div>
+                  <div><small>VES</small><strong id="incomeVes">Bs 0.00</strong></div>
+                </div>
+              </article>
+              <article class="finance-card">
+                <span class="finance-icon expense">↑</span>
+                <div class="finance-card-values">
+                  <span>Egresos</span>
+                  <div><small>USD</small><strong id="expenseUsd">$0.00</strong></div>
+                  <div><small>VES</small><strong id="expenseVes">Bs 0.00</strong></div>
+                </div>
+              </article>
+            </section>
+
+            <section class="finance-panel">
+              <h2>Balance neto</h2>
+              <div class="net-balance">
+                <div><span>Neto USD</span><strong id="balanceUsd">$0.00</strong></div>
+                <div><span>Neto VES</span><strong id="balanceVes">Bs 0.00</strong></div>
+              </div>
+            </section>
+
+            <section class="finance-panel">
+              <h2>Nuevo movimiento</h2>
+              <form id="financeForm" class="finance-form">
+                <label>Tipo
+                  <select name="type">
+                    <option value="income">Ingreso</option>
+                    <option value="expense">Egreso</option>
+                  </select>
+                </label>
+                <label>Fecha<input name="date" type="date" required /></label>
+                <label>Categoria
+                  <select name="category" id="financeCategory"></select>
+                </label>
+                <label>Concepto<input name="description" placeholder="Ej. Limpieza, alquiler..." required /></label>
+                <label>Monto USD<input name="amountUsd" type="number" min="0" step="0.01" /></label>
+                <label>Monto VES<input name="amountVes" type="number" min="0" step="0.01" /></label>
+                <label class="finance-patient">Paciente (opcional)
+                  <select name="patientId" id="financePatient">
+                    <option value="">Sin asociar</option>
+                  </select>
+                </label>
+                <button type="submit" class="primary-button">+ Registrar</button>
+              </form>
+            </section>
+
+            <section class="finance-panel">
+              <h2>Movimientos del periodo</h2>
+              <div id="financeList" class="finance-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="porcentajes" class="view">
+          <div class="percentages-page">
+            <header class="percentages-header">
+              <h1>Porcentajes</h1>
+              <p>Distribuye el ingreso entre la clinica y las odontologas.</p>
+            </header>
+
+            <form id="percentageForm" class="percentage-panel">
+              <div class="percentage-setup">
+                <label>Fecha<input name="date" type="date" required /></label>
+                <label>Numero de odontologas<input name="dentistCount" type="number" min="0" max="20" value="1" required /></label>
+                <label>Tasa de cambio<input name="exchangeRate" type="number" min="0" step="any" inputmode="decimal" placeholder="Bs. por USD" /></label>
+                <button type="button" id="generatePercentages" class="ghost-button">Generar reparto</button>
+              </div>
+
+              <div class="percentage-table-wrap">
+                <table class="percentage-table">
+                  <thead>
+                    <tr>
+                      <th>Beneficiario</th>
+                      <th>Ingreso USD</th>
+                      <th>Ingreso VES</th>
+                      <th>Porcentaje</th>
+                      <th>Accion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="percentageRows"></tbody>
+                  <tfoot>
+                    <tr>
+                      <th>Total clinica</th>
+                      <th id="percentageClinicUsd">$0.00</th>
+                      <th id="percentageClinicVes">Bs. 0.00</th>
+                      <th id="percentageClinicPercent">0.00%</th>
+                      <th></th>
+                    </tr>
+                    <tr id="percentageGrandTotal" class="percentage-grand-total">
+                      <th>Total general</th>
+                      <th id="percentageAmountTotal">$0.00</th>
+                      <th id="percentageVesTotal">Bs. 0.00</th>
+                      <th id="percentageTotal">0.00%</th>
+                      <th></th>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <button type="button" id="addDentistLine" class="add-dentist-button">+ Agregar odontologa</button>
+              <p id="percentageMessage" class="percentage-message">Ingresa los montos de cada beneficiario. El total se calcula abajo.</p>
+              <div class="actions">
+                <button type="submit" class="primary-button">Guardar reparto</button>
+              </div>
+            </form>
+
+            <section class="percentage-panel saved-percentages">
+              <h2>Repartos guardados</h2>
+              <div id="savedPercentages" class="saved-percentage-list"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="percentageReportModal" class="modal-overlay" hidden>
+      <section class="report-modal" role="dialog" aria-modal="true" aria-labelledby="percentageReportTitle">
+        <header class="report-modal-header">
+          <div>
+            <h2 id="percentageReportTitle">Detalle del reparto</h2>
+            <p id="percentageReportSubtitle"></p>
+          </div>
+          <button type="button" class="modal-close" data-close-report-modal aria-label="Cerrar detalle" title="Cerrar">&#215;</button>
+        </header>
+        <div id="percentageReportContent"></div>
+      </section>
+    </div>
+
+    <script src="app.js?v=20260715-32"></script>
+  </body>
+</html>
+
