@@ -9,6 +9,7 @@
   --soft: #e8f5f3;
   --danger: #b42318;
   --radius: 8px;
+  --watermark: url("assets/clinic-logo.png");
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 
@@ -106,6 +107,12 @@ textarea {
 }
 
 .main {
+  background-attachment: fixed;
+  background-color: var(--bg);
+  background-image: linear-gradient(rgba(246, 248, 251, 0.9), rgba(246, 248, 251, 0.9)), var(--watermark);
+  background-position: center, center;
+  background-repeat: no-repeat;
+  background-size: auto, min(660px, 58vw);
   padding: 28px 48px;
   min-width: 0;
 }
@@ -127,7 +134,8 @@ textarea {
 .app-shell[data-view="historial"] .main,
 .app-shell[data-view="balance"] .main,
 .app-shell[data-view="porcentajes"] .main {
-  background: #f5fbfb;
+  background-color: #f5fbfb;
+  background-image: linear-gradient(rgba(245, 251, 251, 0.9), rgba(245, 251, 251, 0.9)), var(--watermark);
   min-height: calc(100vh - 58px);
 }
 
@@ -1389,6 +1397,10 @@ textarea:focus {
 }
 
 @media (max-width: 920px) {
+  .main {
+    background-size: auto, min(460px, 88vw);
+  }
+
   .app-shell {
     grid-template-rows: auto 1fr;
   }
