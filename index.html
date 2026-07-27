@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Consultorio Dental</title>
-    <link rel="stylesheet" href="styles.css?v=20260715-33" />
+    <link rel="stylesheet" href="styles.css?v=20260727-46" />
   </head>
   <body>
     <div class="app-shell" id="appShell" data-view="registro">
@@ -19,6 +19,7 @@
         <nav class="nav" aria-label="Vistas principales">
           <button class="nav-link active" data-view="registro">Registro</button>
           <button class="nav-link" data-view="historial">Historial</button>
+          <button class="nav-link" data-view="odontologas">Odontologas</button>
           <button class="nav-link" data-view="balance">Balance</button>
           <button class="nav-link" data-view="porcentajes">Porcentajes</button>
         </nav>
@@ -30,7 +31,12 @@
             <p class="eyebrow">SPA clinica</p>
             <h1 id="viewTitle">Registro Paciente</h1>
           </div>
-          <p id="statusText">Datos guardados localmente en este navegador.</p>
+          <div class="topbar-actions">
+            <p id="statusText">Datos guardados localmente en este navegador.</p>
+            <label class="header-date">Fecha del dia
+              <input id="patientDate" name="date" form="patientForm" type="date" required />
+            </label>
+          </div>
         </header>
 
         <section id="registro" class="view active">
@@ -40,13 +46,24 @@
               <div class="grid two">
                 <label>Nombre Completo<input name="name" required /></label>
                 <label>Edad<input name="age" type="number" min="0" required /></label>
-                <label>Fecha<input name="date" type="date" required /></label>
                 <label>Fecha de nacimiento<input name="birthDate" type="date" /></label>
                 <label>Cedula<input name="idNumber" required /></label>
                 <label>Telefono<input name="phone" /></label>
                 <label>Telefono auxiliar<input name="secondaryPhone" /></label>
-                <label>Grupo sanguineo<input name="bloodGroup" placeholder="Ej. O+, A-, AB+" /></label>
-                <label class="wide">Direccion<input name="address" /></label>
+                <label>Grupo sanguineo
+                  <select name="bloodGroup">
+                    <option value="">Selecciona un grupo sanguineo</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </label>
+                <label>Direccion<input name="address" /></label>
               </div>
             </section>
 
@@ -66,12 +83,14 @@
               <div class="section-head odontogram-head">
                 <h2>Odontodiagrama</h2>
                 <div class="odontogram-tools">
-                  <span>Color:</span>
-                  <div class="color-tools" aria-label="Color seleccionado">
-                    <button type="button" class="color-option red active" data-color="red"><span></span>Rojo</button>
-                    <button type="button" class="color-option blue" data-color="blue"><span></span>Azul</button>
+                  <span>Herramienta:</span>
+                  <div class="color-tools" aria-label="Herramienta seleccionada">
+                    <button type="button" class="color-option odontogram-tool red active" data-tool="paint" data-color="red"><span></span>Rojo</button>
+                    <button type="button" class="color-option odontogram-tool blue" data-tool="paint" data-color="blue"><span></span>Azul</button>
+                    <button type="button" class="color-option odontogram-tool red" data-tool="caries" data-color="red"><strong class="caries-tool-symbol" aria-hidden="true">X</strong>X roja - Caries</button>
+                    <button type="button" class="color-option odontogram-tool blue" data-tool="caries" data-color="blue"><strong class="caries-tool-symbol" aria-hidden="true">X</strong>X azul - Caries</button>
                   </div>
-                  <small>Click en una seccion para pintarla - click de nuevo para borrarla</small>
+                  <small>Selecciona un color para pintar una cara o una X para marcar caries en toda la pieza.</small>
                 </div>
               </div>
               <div id="odontogram" class="odontogram" aria-label="Odontodiagrama interactivo"></div>
@@ -120,6 +139,43 @@
             </section>
           </div>
         </section>
+        <section id="odontologas" class="view">
+          <div class="dentist-page">
+            <header class="dentist-header">
+              <h1>Creacion de odontologa</h1>
+              <p>Crea, edita y administra el estado de las odontologas.</p>
+            </header>
+
+            <div class="dentist-layout">
+              <section class="dentist-panel">
+                <h2 id="dentistFormTitle">Nueva odontologa</h2>
+                <form id="dentistForm" class="dentist-form">
+                  <label>ID<input name="id" required maxlength="30" autocomplete="off" /></label>
+                  <label>Nombre<input name="name" required maxlength="100" autocomplete="off" /></label>
+                  <label>Status
+                    <select name="status" required>
+                      <option value="active">Activa</option>
+                      <option value="inactive">Inactiva</option>
+                    </select>
+                  </label>
+                  <p id="dentistMessage" class="dentist-message" aria-live="polite"></p>
+                  <div class="actions">
+                    <button type="button" id="cancelDentistEdit" class="ghost-button" hidden>Cancelar</button>
+                    <button type="submit" id="saveDentist" class="primary-button">Crear odontologa</button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="dentist-panel">
+                <div class="dentist-list-header">
+                  <h2>Odontologas registradas</h2>
+                  <span id="dentistCount">0 registros</span>
+                </div>
+                <div id="dentistList" class="dentist-list"></div>
+              </section>
+            </div>
+          </div>
+        </section>
 
         <section id="balance" class="view">
           <div class="finance-page">
@@ -128,9 +184,14 @@
                 <h1>Balance Financiero</h1>
                 <p>Ingresos y egresos · USD / VES</p>
               </div>
-              <div class="finance-tabs">
-                <button type="button" class="finance-filter active" data-filter="biweekly">Quincenal</button>
-                <button type="button" class="finance-filter" data-filter="monthly">Mensual</button>
+              <div class="finance-controls">
+                <label class="finance-month">Mes
+                  <select id="financeMonth" aria-label="Mes seleccionado"></select>
+                </label>
+                <div class="finance-tabs">
+                  <button type="button" class="finance-filter active" data-filter="biweekly">Quincenal</button>
+                  <button type="button" class="finance-filter" data-filter="monthly">Mensual</button>
+                </div>
               </div>
             </header>
 
@@ -178,6 +239,7 @@
                 <label>Monto USD<input name="amountUsd" type="number" min="0" step="0.01" /></label>
                 <label>Monto VES<input name="amountVes" type="number" min="0" step="0.01" /></label>
                 <label class="finance-patient">Paciente (opcional)
+                  <input id="financePatientSearch" type="search" placeholder="Buscar por cedula..." inputmode="numeric" autocomplete="off" />
                   <select name="patientId" id="financePatient">
                     <option value="">Sin asociar</option>
                   </select>
@@ -200,42 +262,36 @@
               <p>Distribuye el ingreso entre la clinica y las odontologas.</p>
             </header>
 
-            <form id="percentageForm" class="percentage-panel">
+            <form id="percentageForm" class="percentage-panel" data-currency-mode="USD">
+              <div class="percentage-mode-bar">
+                <div class="percentage-mode-copy">
+                  <span>Moneda principal del reparto</span>
+                  <strong id="percentageModeLabel">Dolares</strong>
+                </div>
+                <div class="percentage-mode-switch" role="group" aria-label="Moneda principal">
+                  <button type="button" class="percentage-mode-button active" data-percentage-mode="USD" aria-pressed="true">Dolares</button>
+                  <button type="button" class="percentage-mode-button" data-percentage-mode="VES" aria-pressed="false">Bolivares</button>
+                </div>
+              </div>
               <div class="percentage-setup">
                 <label>Fecha<input name="date" type="date" required /></label>
-                <label>Numero de odontologas<input name="dentistCount" type="number" min="0" max="20" value="1" required /></label>
+                <label>Odontologas activas<input name="dentistCount" type="number" min="0" value="0" readonly /></label>
                 <label>Tasa de cambio<input name="exchangeRate" type="number" min="0" step="any" inputmode="decimal" placeholder="Bs. por USD" /></label>
                 <button type="button" id="generatePercentages" class="ghost-button">Generar reparto</button>
               </div>
 
               <div class="percentage-table-wrap">
-                <table class="percentage-table">
+                <table class="percentage-table aligned-totals-table">
                   <thead>
                     <tr>
                       <th>Beneficiario</th>
-                      <th>Ingreso USD</th>
-                      <th>Ingreso VES</th>
-                      <th>Porcentaje</th>
+                      <th id="percentageUsdHeader">Ingreso USD</th>
+                      <th id="percentageVesHeader">Ingreso VES (calculado)</th>
+                      <th>Totales</th>
                       <th>Accion</th>
                     </tr>
                   </thead>
                   <tbody id="percentageRows"></tbody>
-                  <tfoot>
-                    <tr>
-                      <th>Total clinica</th>
-                      <th id="percentageClinicUsd">$0.00</th>
-                      <th id="percentageClinicVes">Bs. 0.00</th>
-                      <th id="percentageClinicPercent">0.00%</th>
-                      <th></th>
-                    </tr>
-                    <tr id="percentageGrandTotal" class="percentage-grand-total">
-                      <th>Total general</th>
-                      <th id="percentageAmountTotal">$0.00</th>
-                      <th id="percentageVesTotal">Bs. 0.00</th>
-                      <th id="percentageTotal">0.00%</th>
-                      <th></th>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
 
@@ -268,7 +324,7 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260715-32"></script>
+    <script src="app.js?v=20260727-49"></script>
   </body>
 </html>
 

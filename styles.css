@@ -83,6 +83,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 26px;
+  flex-wrap: wrap;
 }
 
 .nav-link {
@@ -125,13 +126,28 @@ textarea {
   margin-bottom: 24px;
 }
 
+.topbar-actions {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  width: min(320px, 100%);
+}
+.topbar-actions #statusText {
+  margin-bottom: 0;
+  text-align: right;
+}
+.header-date {
+  width: 100%;
+}
 .app-shell[data-view="historial"] .topbar,
+.app-shell[data-view="odontologas"] .topbar,
 .app-shell[data-view="balance"] .topbar,
 .app-shell[data-view="porcentajes"] .topbar {
   display: none;
 }
 
 .app-shell[data-view="historial"] .main,
+.app-shell[data-view="odontologas"] .main,
 .app-shell[data-view="balance"] .main,
 .app-shell[data-view="porcentajes"] .main {
   background-color: #f5fbfb;
@@ -323,6 +339,10 @@ textarea:focus {
 .color-option.active span {
   background: #fff;
 }
+.caries-tool-symbol {
+  font-size: 0.95rem;
+  line-height: 1;
+}
 
 .color-option.red.active {
   background: #d92d20;
@@ -454,6 +474,30 @@ textarea:focus {
 
 .tooth-face.center {
   stroke-width: 2;
+}
+.tooth-caries-mark {
+  pointer-events: none;
+}
+
+.tooth-caries-mark line {
+  stroke-linecap: round;
+}
+
+.tooth-caries-mark .caries-outline {
+  stroke: #fff;
+  stroke-width: 12;
+}
+
+.tooth-caries-mark .caries-line {
+  stroke-width: 7;
+}
+
+.tooth-caries-mark.red .caries-line {
+  stroke: #d92d20;
+}
+
+.tooth-caries-mark.blue .caries-line {
+  stroke: #1570ef;
 }
 
 .tooth-number {
@@ -774,6 +818,48 @@ textarea:focus {
   background: #f5fbfb;
   font-weight: 800;
 }
+.history-treatment-form,
+.history-treatment-list {
+  display: grid;
+  gap: 14px;
+}
+
+.history-treatment-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 180px 42px;
+}
+
+.history-treatment-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.history-treatment-total {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  font-size: 1.05rem;
+}
+
+.history-treatment-message {
+  color: var(--muted);
+  margin: 0;
+  min-height: 20px;
+}
+
+.history-treatment-message.success {
+  color: #047857;
+  font-weight: 700;
+}
+
+.history-treatment-empty {
+  margin: 0;
+}
 
 .empty-state.compact-visible {
   min-height: auto;
@@ -932,6 +1018,25 @@ textarea:focus {
   margin-bottom: 0;
 }
 
+.finance-controls {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+}
+
+.finance-month {
+  color: #334155;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.finance-month select {
+  min-height: 38px;
+  padding: 7px 10px;
+}
+
 .finance-tabs {
   background: #eaf3f4;
   border-radius: 10px;
@@ -1061,6 +1166,10 @@ textarea:focus {
   grid-column: 1 / 6;
 }
 
+.finance-patient input[type="search"] {
+  background: #f8fafc;
+}
+
 .finance-form .primary-button {
   min-height: 42px;
 }
@@ -1103,42 +1212,177 @@ textarea:focus {
   text-transform: uppercase;
 }
 
+.percentage-workspace {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 1fr) 340px;
+}
+
 .percentage-table-wrap {
   border: 1px solid #cdd7e2;
-  border-radius: var(--radius);
+  border-radius: 12px;
   overflow: auto;
 }
 
 .percentage-table {
   border-collapse: collapse;
-  min-width: 880px;
+  min-width: 720px;
   width: 100%;
 }
 
 .percentage-table th,
 .percentage-table td {
-  border-bottom: 1px solid #dbe4ee;
-  padding: 12px 16px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 14px 16px;
   text-align: left;
+}
+
+.percentage-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.percentage-table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.percentage-table tbody tr:hover {
+  background: #fbfdfd;
 }
 
 .percentage-table thead th {
   background: #f8fafc;
   color: #475569;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
 }
 
 .percentage-table tbody td:nth-child(2),
-.percentage-table tbody td:nth-child(3),
-.percentage-table tbody td:nth-child(4),
-.percentage-table tfoot th:not(:first-child) {
+.percentage-table tbody td:nth-child(3) {
   text-align: right;
 }
 
-.percentage-table tbody td:nth-child(5),
-.percentage-table thead th:nth-child(5) {
+.percentage-row-actions,
+.percentage-table thead th:last-child {
   text-align: center;
+  width: 110px;
+}
+
+.not-applicable {
+  color: #94a3b8;
+  font-weight: 800;
+}
+
+.percentage-summary-panel {
+  background: #fff;
+  border: 1px solid #b9dcd7;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.09);
+  overflow: hidden;
+  position: sticky;
+  top: 20px;
+}
+
+.percentage-summary-header {
+  background: linear-gradient(135deg, #0f766e, #159a8c);
+  color: #fff;
+  display: grid;
+  gap: 3px;
+  padding: 16px 18px;
+}
+
+.percentage-summary-header span {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+  text-transform: uppercase;
+}
+
+.percentage-summary-header strong {
+  font-size: 1.05rem;
+}
+
+.percentage-summary {
+  display: grid;
+}
+
+.percentage-summary-item {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+}
+
+.percentage-summary-item + .percentage-summary-item {
+  border-top: 1px solid #e2e8f0;
+}
+
+.percentage-summary-title {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.percentage-summary-title strong {
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.percentage-summary-title b {
+  background: #dff5f1;
+  border-radius: 999px;
+  color: #0f766e;
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.percentage-summary-values {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.percentage-summary-values span {
+  background: #f8fafc;
+  border-radius: 8px;
+  color: #334155;
+  display: grid;
+  font-size: 0.78rem;
+  font-weight: 750;
+  gap: 2px;
+  padding: 8px 10px;
+}
+
+.percentage-summary-values small {
+  color: #94a3b8;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.percentage-summary-item.grand {
+  background: #0f766e;
+}
+
+.percentage-summary-item.grand .percentage-summary-title strong {
+  color: #fff;
+}
+
+.percentage-summary-item.grand .percentage-summary-title b {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.percentage-summary-item.grand .percentage-summary-values span {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.percentage-summary-item.grand .percentage-summary-values small {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .percentage-table input {
@@ -1320,7 +1564,7 @@ textarea:focus {
   border-radius: var(--radius);
   box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
   max-height: min(760px, calc(100vh - 40px));
-  max-width: 960px;
+  max-width: 1180px;
   overflow: auto;
   padding: 24px;
   width: 100%;
@@ -1396,6 +1640,281 @@ textarea:focus {
   font-weight: 800;
 }
 
+.structured-report-wrap {
+  border-color: #b9dcd7;
+}
+
+.structured-report-table {
+  min-width: 820px;
+  table-layout: fixed;
+}
+
+.structured-report-table th:nth-child(1) {
+  width: 34%;
+}
+
+.structured-report-table th:nth-child(2) {
+  background: #e6f7f4;
+  color: #0f766e;
+  width: 33%;
+}
+
+.structured-report-table th:nth-child(3) {
+  width: 33%;
+}
+
+.structured-report-table tbody td {
+  padding: 14px 12px;
+  vertical-align: middle;
+}
+
+.report-beneficiary-box,
+.report-single-amount,
+.report-mixed-amount {
+  background: #fff;
+  border: 1px solid #d5e0ea;
+  border-radius: 9px;
+  min-height: 42px;
+}
+
+.report-beneficiary-box,
+.report-single-amount {
+  align-items: center;
+  display: flex;
+  padding: 9px 12px;
+}
+
+.report-single-amount {
+  font-weight: 750;
+  justify-content: flex-end;
+}
+
+.report-mixed-amount {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 7px 10px;
+}
+
+.report-mixed-amount span {
+  display: grid;
+  gap: 2px;
+}
+
+.report-mixed-amount small {
+  color: #64748b;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.report-mixed-amount strong {
+  color: #0f172a;
+  font-size: 0.78rem;
+}
+
+.structured-report-total-cell {
+  background: #f4fbfa;
+  padding: 10px 14px !important;
+}
+
+.structured-report-total b {
+  max-width: 150px;
+  text-align: right;
+  white-space: normal;
+}
+
+.structured-report-grand-row td {
+  background: #f8fafc;
+  border-top: 2px solid #70c2b5;
+  font-weight: 800;
+}
+
+.structured-report-grand-label {
+  color: #475569;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-align: right !important;
+  text-transform: uppercase;
+}
+
+.structured-report-total-cell.grand {
+  background: #0f766e;
+}
+
+.structured-report-total-cell.grand .structured-report-total strong,
+.structured-report-total-cell.grand .structured-report-total b,
+.structured-report-total-cell.grand .structured-report-total > span {
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .report-mixed-amount {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dentist-page {
+  display: grid;
+  gap: 24px;
+  margin: 0 auto;
+  max-width: 1180px;
+}
+
+.dentist-header h1 {
+  margin-bottom: 6px;
+}
+
+.dentist-header p {
+  color: #64748b;
+  margin-bottom: 0;
+}
+
+.dentist-layout {
+  align-items: start;
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+}
+
+.dentist-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  padding: 24px;
+}
+
+.dentist-form,
+.dentist-list {
+  display: grid;
+  gap: 14px;
+}
+
+.dentist-message {
+  color: var(--muted);
+  margin: 0;
+  min-height: 20px;
+}
+
+.dentist-message.error {
+  color: #b42318;
+  font-weight: 700;
+}
+
+.dentist-message.success {
+  color: #047857;
+  font-weight: 700;
+}
+
+.dentist-list-header {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.dentist-list-header h2 {
+  margin-bottom: 0;
+}
+
+.dentist-list-header span {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.dentist-card {
+  align-items: center;
+  border: 1px solid #dbe4ee;
+  border-radius: var(--radius);
+  display: grid;
+  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 14px 16px;
+}
+
+.dentist-card-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.dentist-card-main strong {
+  overflow-wrap: anywhere;
+}
+
+.dentist-card-main span {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.dentist-status {
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 5px 10px;
+}
+
+.dentist-status.active {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.dentist-status.inactive {
+  background: #fee2e2;
+  color: #b42318;
+}
+
+.dentist-card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dentist-card-actions .ghost-button,
+.danger-button {
+  padding: 8px 10px;
+}
+
+.danger-button {
+  background: #fff;
+  border: 1px solid #f0b4b4;
+  border-radius: var(--radius);
+  color: #b42318;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.danger-button:hover {
+  background: #fff1f1;
+}
+
+.ghost-button[hidden] {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .dentist-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .dentist-card {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .dentist-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .dentist-card-actions button {
+    flex: 1;
+  }
+}
 @media (max-width: 920px) {
   .main {
     background-size: auto, min(460px, 88vw);
@@ -1442,6 +1961,14 @@ textarea:focus {
     flex-direction: column;
   }
 
+  .topbar-actions {
+    justify-items: stretch;
+    width: 100%;
+  }
+  .topbar-actions #statusText {
+    text-align: left;
+  }
+
   .finance-summary-cards,
   .finance-form,
   .percentage-setup {
@@ -1475,7 +2002,243 @@ textarea:focus {
 
   .stats,
   .profile-grid,
-  .treatment-row {
+  .treatment-row,
+  .history-treatment-row {
     grid-template-columns: 1fr;
+  }
+
+  .history-treatment-row .icon-button {
+    min-height: 42px;
+  }
+}
+@media (max-width: 1100px) {
+  .percentage-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .percentage-summary-panel {
+    position: static;
+  }
+
+  .percentage-summary {
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  }
+
+  .percentage-summary-item + .percentage-summary-item {
+    border-left: 1px solid #e2e8f0;
+    border-top: 0;
+  }
+}
+
+@media (max-width: 650px) {
+  .percentage-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .percentage-summary-item + .percentage-summary-item {
+    border-left: 0;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .percentage-summary-values {
+    grid-template-columns: 1fr;
+  }
+}
+.aligned-totals-table {
+  min-width: 1080px;
+}
+
+.aligned-totals-table th:nth-child(1) {
+  width: 23%;
+}
+
+.aligned-totals-table th:nth-child(2),
+.aligned-totals-table th:nth-child(3) {
+  width: 22%;
+}
+
+.aligned-totals-table th:nth-child(4) {
+  width: 25%;
+}
+
+.aligned-totals-table th:nth-child(5) {
+  width: 8%;
+}
+
+.percentage-row-total {
+  background: #f4fbfa;
+  min-width: 270px;
+  padding: 10px 14px !important;
+  vertical-align: middle;
+}
+
+.percentage-inline-total {
+  display: grid;
+  gap: 4px;
+}
+
+.percentage-inline-total > div {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.percentage-inline-total strong {
+  color: #0f172a;
+  overflow-wrap: anywhere;
+}
+
+.percentage-inline-total b {
+  color: #0f766e;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.percentage-inline-total > span {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.percentage-grand-summary-row td {
+  background: #f8fafc;
+  border-top: 2px solid #9fcfc8;
+  font-weight: 800;
+}
+
+.percentage-grand-label {
+  color: #475569;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-align: right !important;
+  text-transform: uppercase;
+}
+
+.percentage-row-total.grand {
+  background: #0f766e;
+}
+
+.percentage-row-total.grand .percentage-inline-total strong,
+.percentage-row-total.grand .percentage-inline-total b,
+.percentage-row-total.grand .percentage-inline-total > span {
+  color: #fff;
+}
+
+.percentage-grand-summary-row .percentage-row-actions {
+  background: #f8fafc;
+}
+
+.percentage-mode-bar {
+  align-items: center;
+  background: linear-gradient(135deg, #f0fdfa, #f8fafc);
+  border: 1px solid #b9dcd7;
+  border-radius: 12px;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+}
+
+.percentage-mode-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.percentage-mode-copy span {
+  color: #64748b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.percentage-mode-copy strong {
+  color: #0f766e;
+  font-size: 1rem;
+}
+
+.percentage-mode-switch {
+  background: #e2e8f0;
+  border-radius: 10px;
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  padding: 4px;
+}
+
+.percentage-mode-button {
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  min-height: 38px;
+  padding: 8px 16px;
+}
+
+.percentage-mode-button.active {
+  background: #0f766e;
+  box-shadow: 0 2px 7px rgba(15, 118, 110, 0.2);
+  color: #fff;
+}
+
+.percentage-table input[readonly] {
+  background: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+}
+
+.percentage-panel[data-currency-mode="USD"] #percentageUsdHeader,
+.percentage-panel[data-currency-mode="VES"] #percentageVesHeader {
+  background: #e6f7f4;
+  color: #0f766e;
+}
+
+.percentage-panel[data-currency-mode="USD"] .percentage-amount-input:not([readonly]),
+.percentage-panel[data-currency-mode="VES"] .percentage-ves-input:not([readonly]) {
+  border-color: #6bbdb1;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.08);
+}
+
+.percentage-panel[data-currency-mode="USD"] .percentage-table th:nth-child(3),
+.percentage-panel[data-currency-mode="USD"] .percentage-table tr[data-clinic] td:nth-child(3),
+.percentage-panel[data-currency-mode="VES"] .percentage-table th:nth-child(2),
+.percentage-panel[data-currency-mode="VES"] .percentage-table tr[data-clinic] td:nth-child(2) {
+  display: none;
+}
+
+.percentage-panel[data-currency-mode] .aligned-totals-table {
+  min-width: 900px;
+}
+
+.percentage-panel[data-currency-mode] .aligned-totals-table th:nth-child(1) {
+  width: 30%;
+}
+
+.percentage-panel[data-currency-mode="USD"] .aligned-totals-table th:nth-child(2),
+.percentage-panel[data-currency-mode="VES"] .aligned-totals-table th:nth-child(3) {
+  width: 30%;
+}
+
+.percentage-panel[data-currency-mode] .aligned-totals-table th:nth-child(4) {
+  width: 32%;
+}
+
+.percentage-panel[data-currency-mode] .aligned-totals-table th:nth-child(5) {
+  width: 8%;
+}
+
+@media (max-width: 700px) {
+  .percentage-mode-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .percentage-mode-switch {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
