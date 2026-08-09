@@ -17,6 +17,7 @@ const state = {
   financeFilter: "biweekly",
   financeMonth: getMonthValue(new Date()),
   percentageCurrencyMode: "USD",
+  lastReport: null,
 };
 
 const odontogramRows = [
@@ -563,6 +564,11 @@ function bindPercentages() {
     if (event.target.id === "percentageReportModal" || event.target.closest("[data-close-report-modal]")) {
       closePercentageReport();
     }
+    const exportButton = event.target.closest("[data-export-report]");
+    if (exportButton) {
+      if (exportButton.dataset.exportReport === "excel") exportReportToCsv();
+      if (exportButton.dataset.exportReport === "pdf") exportReportToPdf();
+    }
   });
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") closePercentageReport();
@@ -571,8 +577,8 @@ function bindPercentages() {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     const rows = getPercentageRows();
-    const income = rows.reduce((sum, row) => sum + row.amount, 0);
-    const incomeVes = rows.reduce((sum, row) => sum + row.amountVes, 0);
+    const income = rows[0] ? rows[0].amount : 0;
+    const incomeVes = rows[0] ? rows[0].amountVes : 0;
     const primaryIncome = state.percentageCurrencyMode === "VES" ? incomeVes : income;
 
     if (!primaryIncome) {
@@ -602,55 +608,102 @@ function renderPercentageRows() {
   const dentistIds = getActiveDentistIds();
   const body = document.getElementById("percentageRows");
   const previous = getPercentageRows();
-  const previousById = new Map(previous.slice(1).map((row) => [row.name, row]));
+  const previousById = new Map(previous.slice(1).filter((row) => row.dentistId).map((row) => [row.dentistId, row]));
   body.innerHTML = "";
 
   createPercentageRow(body, previous[0] || { name: "Clinica", amount: 0 }, true);
   dentistIds.forEach((dentistId) => {
-    createPercentageRow(body, previousById.get(dentistId) || { name: dentistId, amount: 0 });
+    createPercentageRow(body, previousById.get(dentistId) || { name: dentistId, dentistId, amount: 0 });
   });
   form.elements.dentistCount.value = dentistIds.length;
   updatePercentageTotals();
 }
+function getActiveDentists() {
+  return state.dentists.filter((dentist) => dentist.status === "active");
+}
+
 function getActiveDentistIds() {
-  return state.dentists.filter((dentist) => dentist.status === "active").map((dentist) => dentist.id);
+  return getActiveDentists().map((dentist) => dentist.id);
+}
+
+function renderDentistOptions(selectedId) {
+  const options = getActiveDentists().map((dentist) => {
+    const percentage = Number(dentist.percentage) || 0;
+    const label = `${dentist.name || dentist.id} (${percentage}%)`;
+    const selected = dentist.id === selectedId ? " selected" : "";
+    return `<option value="${escapeHtml(dentist.id)}"${selected}>${escapeHtml(label)}</option>`;
+  }).join("");
+  return `<option value="">Selecciona odontologa...</option>${options}`;
 }
 
 function createPercentageRow(body, row, clinic = false) {
   const element = document.createElement("tr");
   element.dataset.clinic = clinic ? "true" : "false";
+  const beneficiaryCell = clinic
+    ? `<input class="percentage-name" value="${escapeHtml(row.name)}" aria-label="Clinica" />`
+    : `<select class="percentage-name percentage-dentist-select" aria-label="Odontologa">${renderDentistOptions(row.dentistId)}</select>`;
   element.innerHTML = `
-    <td><input class="percentage-name" value="${escapeHtml(row.name)}" ${clinic ? "aria-label=\"Clinica\"" : "aria-label=\"ID de odontologa\""} /></td>
-    <td><input class="percentage-amount-input" type="number" min="0" step="any" inputmode="decimal" value="${row.amount ? Number(row.amount) : ""}" aria-label="Ingreso USD" /></td>
-    <td><input class="percentage-ves-input" type="number" min="0" step="any" inputmode="decimal" value="${row.amountVes ? Number(row.amountVes) : ""}" aria-label="Ingreso VES" /></td>
+    <td>${beneficiaryCell}</td>
+    <td><input class="percentage-amount-input" type="number" min="0" step="any" inputmode="decimal" value="${row.amount ? Number(row.amount) : ""}" aria-label="Ingreso USD" ${clinic ? "" : "readonly"} /></td>
+    <td><input class="percentage-ves-input" type="number" min="0" step="any" inputmode="decimal" value="${row.amountVes ? Number(row.amountVes) : ""}" aria-label="Ingreso VES" ${clinic ? "" : "readonly"} /></td>
     <td class="percentage-row-total"></td>
     <td class="percentage-row-actions">${clinic ? '<span class="not-applicable" aria-label="No aplica">-</span>' : '<button type="button" class="remove-dentist-button">Quitar</button>'}</td>
   `;
   element.querySelector(".percentage-amount-input").addEventListener("input", () => {
     if (state.percentageCurrencyMode === "USD") syncVesFromUsd(element);
+    if (clinic) recomputeAllDentistRows();
     updatePercentageTotals();
   });
   element.querySelector(".percentage-ves-input").addEventListener("input", () => {
     if (state.percentageCurrencyMode === "VES") syncUsdFromVes(element);
+    if (clinic) recomputeAllDentistRows();
     updatePercentageTotals();
   });
-  element.querySelector(".percentage-name").addEventListener("input", updatePercentageTotals);
   configurePercentageRowInputs(element);
-  if (!clinic) {
+  if (clinic) {
+    element.querySelector(".percentage-name").addEventListener("input", updatePercentageTotals);
+  } else {
+    element.querySelector(".percentage-dentist-select").addEventListener("change", () => {
+      recomputeDentistRow(element);
+      updatePercentageTotals();
+    });
     element.querySelector(".remove-dentist-button").addEventListener("click", () => {
       element.remove();
       updateDentistCount();
       updatePercentageTotals();
     });
+    recomputeDentistRow(element);
   }
   body.appendChild(element);
 }
 
+function recomputeDentistRow(element) {
+  const select = element.querySelector(".percentage-dentist-select");
+  const dentist = state.dentists.find((item) => item.id === select.value);
+  const percentage = dentist ? Math.min(100, Math.max(0, Number(dentist.percentage) || 0)) : 0;
+  const usdInput = element.querySelector(".percentage-amount-input");
+  const vesInput = element.querySelector(".percentage-ves-input");
+  const clinicRow = document.querySelector('#percentageRows tr[data-clinic="true"]');
+  if (!clinicRow) {
+    usdInput.value = "";
+    vesInput.value = "";
+    return;
+  }
+  const clinicUsd = Number(clinicRow.querySelector(".percentage-amount-input").value || 0);
+  const clinicVes = Number(clinicRow.querySelector(".percentage-ves-input").value || 0);
+  usdInput.value = clinicUsd ? (clinicUsd * percentage / 100).toFixed(2) : "";
+  vesInput.value = clinicVes ? (clinicVes * percentage / 100).toFixed(2) : "";
+}
+
+function recomputeAllDentistRows() {
+  document.querySelectorAll('#percentageRows tr[data-clinic="false"]').forEach(recomputeDentistRow);
+}
+
 function addDentistLine() {
   const body = document.getElementById("percentageRows");
-  const usedIds = new Set(Array.from(body.querySelectorAll('tr[data-clinic="false"] .percentage-name')).map((input) => input.value));
+  const usedIds = new Set(Array.from(body.querySelectorAll('tr[data-clinic="false"] .percentage-dentist-select')).map((select) => select.value));
   const dentistId = getActiveDentistIds().find((id) => !usedIds.has(id)) || "";
-  createPercentageRow(body, { name: dentistId, amount: 0 });
+  createPercentageRow(body, { name: dentistId, dentistId, amount: 0 });
   updateDentistCount();
   updatePercentageTotals();
 }
@@ -683,7 +736,7 @@ function setPercentageCurrencyMode(mode) {
     button.setAttribute("aria-pressed", String(isActive));
   });
 
-  document.querySelectorAll("#percentageRows tr[data-clinic]").forEach((row) => {
+  document.querySelectorAll('#percentageRows tr[data-clinic="true"]').forEach((row) => {
     configurePercentageRowInputs(row);
     if (isVesMode) {
       syncUsdFromVes(row, true);
@@ -691,23 +744,31 @@ function setPercentageCurrencyMode(mode) {
       syncVesFromUsd(row);
     }
   });
+  document.querySelectorAll('#percentageRows tr[data-clinic="false"]').forEach(configurePercentageRowInputs);
+  recomputeAllDentistRows();
   updatePercentageTotals();
 }
 
 function configurePercentageRowInputs(row) {
+  if (row.dataset.clinic !== "true") {
+    row.querySelector(".percentage-amount-input").readOnly = true;
+    row.querySelector(".percentage-ves-input").readOnly = true;
+    return;
+  }
   const isVesMode = state.percentageCurrencyMode === "VES";
   row.querySelector(".percentage-amount-input").readOnly = isVesMode;
   row.querySelector(".percentage-ves-input").readOnly = !isVesMode;
 }
 
 function handlePercentageExchangeRateChange() {
-  document.querySelectorAll("#percentageRows tr[data-clinic]").forEach((row) => {
+  document.querySelectorAll('#percentageRows tr[data-clinic="true"]').forEach((row) => {
     if (state.percentageCurrencyMode === "VES") {
       syncUsdFromVes(row, true);
     } else {
       syncVesFromUsd(row);
     }
   });
+  recomputeAllDentistRows();
   updatePercentageTotals();
 }
 
@@ -715,18 +776,30 @@ function getPercentageRows() {
   const exchangeRate = getExchangeRate();
   const isVesMode = state.percentageCurrencyMode === "VES";
   const rows = Array.from(document.querySelectorAll("#percentageRows tr[data-clinic]")).map((row) => {
+    const isClinic = row.dataset.clinic === "true";
     const amountInput = Number(row.querySelector(".percentage-amount-input").value || 0);
     const amountVesInput = Number(row.querySelector(".percentage-ves-input").value || 0);
+    let name;
+    let dentistId = null;
+    if (isClinic) {
+      name = row.querySelector(".percentage-name").value.trim() || "Clinica";
+    } else {
+      const select = row.querySelector(".percentage-dentist-select");
+      dentistId = select ? select.value : "";
+      const dentist = state.dentists.find((item) => item.id === dentistId);
+      name = dentist ? dentist.name || dentist.id : "Sin asignar";
+    }
     return {
-      name: row.querySelector(".percentage-name").value.trim() || "Sin nombre",
+      name,
+      dentistId,
       amount: isVesMode ? (exchangeRate ? amountVesInput / exchangeRate : 0) : amountInput,
       amountVes: isVesMode ? amountVesInput : amountInput * exchangeRate,
     };
   });
-  const total = rows.reduce((sum, row) => sum + (isVesMode ? row.amountVes : row.amount), 0);
+  const clinicBase = rows[0] ? (isVesMode ? rows[0].amountVes : rows[0].amount) : 0;
   return rows.map((row) => ({
     ...row,
-    percentage: total ? (isVesMode ? row.amountVes : row.amount) / total * 100 : 0,
+    percentage: clinicBase ? (isVesMode ? row.amountVes : row.amount) / clinicBase * 100 : 0,
   }));
 }
 
@@ -765,20 +838,20 @@ function syncUsdFromVes(row, silent = false) {
 
 function updatePercentageTotals() {
   const rows = getPercentageRows();
-  const amountTotal = rows.reduce((sum, row) => sum + row.amount, 0);
-  const amountVesTotal = rows.reduce((sum, row) => sum + row.amountVes, 0);
 
-  document.querySelectorAll("#percentageRows tr[data-clinic]").forEach((row, index) => {
-    const usdInput = row.querySelector(".percentage-amount-input");
-    const vesInput = row.querySelector(".percentage-ves-input");
+  const clinicRow = document.querySelector('#percentageRows tr[data-clinic="true"]');
+  if (clinicRow) {
+    const usdInput = clinicRow.querySelector(".percentage-amount-input");
+    const vesInput = clinicRow.querySelector(".percentage-ves-input");
     if (state.percentageCurrencyMode === "VES") {
-      usdInput.value = vesInput.value && getExchangeRate() ? rows[index].amount.toFixed(2) : "";
+      usdInput.value = vesInput.value && getExchangeRate() ? rows[0].amount.toFixed(2) : "";
     } else {
-      vesInput.value = usdInput.value ? rows[index].amountVes.toFixed(2) : "";
+      vesInput.value = usdInput.value ? rows[0].amountVes.toFixed(2) : "";
     }
-  });
-  renderPercentageSummary(rows, amountTotal, amountVesTotal);
-  const primaryTotal = state.percentageCurrencyMode === "VES" ? amountVesTotal : amountTotal;
+  }
+
+  renderPercentageSummary(rows);
+  const primaryTotal = state.percentageCurrencyMode === "VES" ? rows[0]?.amountVes : rows[0]?.amount;
   const primaryCurrency = state.percentageCurrencyMode === "VES" ? "bolivares" : "dolares";
   const message = primaryTotal
     ? `Modo ${primaryCurrency}: la otra moneda se calcula automaticamente con la tasa de cambio.`
@@ -786,24 +859,15 @@ function updatePercentageTotals() {
   setPercentageMessage(message);
 }
 
-function renderPercentageSummary(rows, amountTotal, amountVesTotal) {
+function renderPercentageSummary(rows) {
   const body = document.getElementById("percentageRows");
-  body.querySelector(".percentage-grand-summary-row")?.remove();
   const tableRows = Array.from(body.querySelectorAll("tr[data-clinic]"));
-  const primaryTotal = state.percentageCurrencyMode === "VES" ? amountVesTotal : amountTotal;
 
   tableRows.forEach((row, index) => {
-    const item = rows[index] || { name: "Sin nombre", amount: 0, amountVes: 0 };
+    const item = rows[index] || { name: "Sin nombre", amount: 0, amountVes: 0, percentage: 0 };
     const label = index === 0 ? "Total clinica" : "Total " + (item.name === "Sin nombre" ? index : item.name);
-    const primaryAmount = state.percentageCurrencyMode === "VES" ? item.amountVes : item.amount;
-    const percentage = primaryTotal ? primaryAmount / primaryTotal * 100 : 0;
-    row.querySelector(".percentage-row-total").innerHTML = renderInlinePercentageTotal(label, item.amount, item.amountVes, percentage);
+    row.querySelector(".percentage-row-total").innerHTML = renderInlinePercentageTotal(label, item.amount, item.amountVes, item.percentage || 0);
   });
-
-  const grandRow = document.createElement("tr");
-  grandRow.className = "percentage-grand-summary-row";
-  grandRow.innerHTML = '<td class="percentage-grand-label" colspan="2">Resumen general del reparto</td><td class="percentage-row-total grand">' + renderInlinePercentageTotal("Total general", amountTotal, amountVesTotal, primaryTotal ? 100 : 0) + '</td><td class="percentage-row-actions"><span class="not-applicable">-</span></td>';
-  body.appendChild(grandRow);
 }
 
 function renderInlinePercentageTotal(label, amount, amountVes, percentage) {
@@ -903,10 +967,13 @@ function openPercentageReport(reportId) {
   }));
   const currencyMode = entry.currencyMode === "VES" ? "VES" : "USD";
 
-  document.getElementById("percentageReportTitle").textContent = "Reporte del d\u00eda";
+  const title = "Reporte del d\u00eda";
   const reportMode = entry.currencyMode === "VES" ? "Bol\u00edvares" : "D\u00f3lares";
-  document.getElementById("percentageReportSubtitle").textContent = `Fecha: ${entry.date} - Modo: ${reportMode}${exchangeRate ? ` - Tasa: ${formatVes(exchangeRate)} por USD` : ""}`;
-  document.getElementById("percentageReportContent").innerHTML = renderStructuredPercentageReport(rows, currencyMode, "Total general");
+  const subtitle = `Fecha: ${entry.date} - Modo: ${reportMode}${exchangeRate ? ` - Tasa: ${formatVes(exchangeRate)} por USD` : ""}`;
+  document.getElementById("percentageReportTitle").textContent = title;
+  document.getElementById("percentageReportSubtitle").textContent = subtitle;
+  document.getElementById("percentageReportContent").innerHTML = renderStructuredPercentageReport(rows, currencyMode);
+  state.lastReport = { title, subtitle, rows, currencyMode, filename: `reporte-dia-${entry.date}` };
   document.getElementById("percentageReportModal").hidden = false;
 }
 
@@ -951,21 +1018,18 @@ function openMonthlyPercentageReport(monthKey) {
   const modes = new Set(entries.map((entry) => entry.currencyMode === "VES" ? "VES" : "USD"));
   const currencyMode = modes.size > 1 ? "MIXED" : Array.from(modes)[0];
   const metadata = getMonthMetadata(monthKey);
-  document.getElementById("percentageReportTitle").textContent = "Reporte general mensual";
+  const title = "Reporte general mensual";
   const currencySummary = currencyMode === "MIXED" ? "D\u00f3lares y Bol\u00edvares" : (currencyMode === "VES" ? "Bol\u00edvares" : "D\u00f3lares");
-  document.getElementById("percentageReportSubtitle").textContent = `Periodo: ${metadata.range} - ${entries.length} repartos - Moneda: ${currencySummary}`;
-  document.getElementById("percentageReportContent").innerHTML = renderStructuredPercentageReport(rows, currencyMode, "Total general del mes");
+  const subtitle = `Periodo: ${metadata.range} - ${entries.length} repartos - Moneda: ${currencySummary}`;
+  document.getElementById("percentageReportTitle").textContent = title;
+  document.getElementById("percentageReportSubtitle").textContent = subtitle;
+  document.getElementById("percentageReportContent").innerHTML = renderStructuredPercentageReport(rows, currencyMode);
+  state.lastReport = { title, subtitle, rows, currencyMode, filename: `reporte-mensual-${monthKey}` };
   document.getElementById("percentageReportModal").hidden = false;
 }
 
-function renderStructuredPercentageReport(rows, currencyMode, grandLabel) {
-  const totals = rows.reduce((summary, row) => {
-    summary.amount += Number(row.amount || 0);
-    summary.amountVes += Number(row.amountVes || 0);
-    summary.primaryUsd += getReportPrimaryUsd(row, currencyMode);
-    summary.primaryVes += getReportPrimaryVes(row, currencyMode);
-    return summary;
-  }, { amount: 0, amountVes: 0, primaryUsd: 0, primaryVes: 0 });
+function renderStructuredPercentageReport(rows, currencyMode) {
+  const clinicRow = rows[0] || { amount: 0, amountVes: 0 };
   const amountHeader = currencyMode === "MIXED" ? "Ingresos USD / VES" : (currencyMode === "VES" ? "Ingreso VES" : "Ingreso USD");
 
   return `
@@ -977,17 +1041,13 @@ function renderStructuredPercentageReport(rows, currencyMode, grandLabel) {
         <tbody>
           ${rows.map((row, index) => {
             const totalLabel = index === 0 ? "Total clinica" : `Total ${row.name === "Sin nombre" ? index : row.name}`;
-            const percentageText = getStructuredReportPercentage(row, currencyMode, totals);
+            const percentageText = getStructuredReportPercentage(row, currencyMode, clinicRow);
             return `<tr>
               <td><div class="report-beneficiary-box">${escapeHtml(row.name)}</div></td>
               <td>${renderReportPrimaryAmount(row, currencyMode)}</td>
               <td class="structured-report-total-cell">${renderStructuredReportTotal(totalLabel, row.amount, row.amountVes, percentageText)}</td>
             </tr>`;
           }).join("")}
-          <tr class="structured-report-grand-row">
-            <td class="structured-report-grand-label" colspan="2">Resumen general del reparto</td>
-            <td class="structured-report-total-cell grand">${renderStructuredReportTotal(grandLabel, totals.amount, totals.amountVes, getStructuredReportPercentage(totals, currencyMode, totals))}</td>
-          </tr>
         </tbody>
       </table>
     </div>
@@ -1016,18 +1076,15 @@ function renderReportPrimaryAmount(row, currencyMode) {
   return `<div class="report-single-amount">${currencyMode === "VES" ? formatVes(primaryVes) : formatUsd(primaryUsd)}</div>`;
 }
 
-function getStructuredReportPercentage(row, currencyMode, totals) {
-  if (currencyMode !== "MIXED" && Number.isFinite(row.percentage)) {
-    return `${Number(row.percentage).toFixed(2)}%`;
-  }
+function getStructuredReportPercentage(row, currencyMode, clinicRow) {
   if (currencyMode === "MIXED") {
     const percentages = [];
-    if (totals.primaryUsd) percentages.push(`USD ${(getReportPrimaryUsd(row, currencyMode) / totals.primaryUsd * 100).toFixed(2)}%`);
-    if (totals.primaryVes) percentages.push(`VES ${(getReportPrimaryVes(row, currencyMode) / totals.primaryVes * 100).toFixed(2)}%`);
+    if (clinicRow.amount) percentages.push(`USD ${(row.amount / clinicRow.amount * 100).toFixed(2)}%`);
+    if (clinicRow.amountVes) percentages.push(`VES ${(row.amountVes / clinicRow.amountVes * 100).toFixed(2)}%`);
     return percentages.length ? percentages.join(" ? ") : "0.00%";
   }
-  const total = currencyMode === "VES" ? totals.primaryVes : totals.primaryUsd;
-  const amount = currencyMode === "VES" ? getReportPrimaryVes(row, currencyMode) : getReportPrimaryUsd(row, currencyMode);
+  const total = currencyMode === "VES" ? clinicRow.amountVes : clinicRow.amount;
+  const amount = currencyMode === "VES" ? row.amountVes : row.amount;
   return `${(total ? amount / total * 100 : 0).toFixed(2)}%`;
 }
 
@@ -1042,6 +1099,90 @@ function closePercentageReport() {
   document.getElementById("percentageReportModal").hidden = true;
 }
 
+function exportReportToCsv() {
+  const report = state.lastReport;
+  if (!report) return;
+  const clinicRow = report.rows[0] || { amount: 0, amountVes: 0 };
+  const header = ["Beneficiario", "Ingreso USD", "Ingreso VES", "Porcentaje"];
+  const lines = [header.map(csvEscape).join(",")];
+  report.rows.forEach((row, index) => {
+    const label = index === 0 ? "Total clinica" : row.name;
+    const percentageText = getStructuredReportPercentage(row, report.currencyMode, clinicRow);
+    lines.push([
+      csvEscape(label),
+      Number(row.amount || 0).toFixed(2),
+      Number(row.amountVes || 0).toFixed(2),
+      csvEscape(percentageText),
+    ].join(","));
+  });
+  downloadBlob("﻿" + lines.join("\r\n"), `${report.filename}.csv`, "text/csv;charset=utf-8;");
+}
+
+function exportReportToPdf() {
+  const report = state.lastReport;
+  if (!report) return;
+  const clinicRow = report.rows[0] || { amount: 0, amountVes: 0 };
+  const rowsHtml = report.rows.map((row, index) => {
+    const label = index === 0 ? "Total clinica" : row.name;
+    const percentageText = getStructuredReportPercentage(row, report.currencyMode, clinicRow);
+    return `<tr>
+      <td>${escapeHtml(label)}</td>
+      <td>${formatUsd(Number(row.amount || 0))}</td>
+      <td>${formatVes(Number(row.amountVes || 0))}</td>
+      <td>${escapeHtml(percentageText)}</td>
+    </tr>`;
+  }).join("");
+
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    setPercentageMessage("El navegador bloqueo la ventana de impresion. Habilita las ventanas emergentes.", true);
+    return;
+  }
+  printWindow.document.write(`<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>${escapeHtml(report.title)}</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  p { color: #475569; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 0.9rem; }
+  th { background: #f1f5f9; }
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(report.title)}</h1>
+  <p>${escapeHtml(report.subtitle)}</p>
+  <table>
+    <thead><tr><th>Beneficiario</th><th>Ingreso USD</th><th>Ingreso VES</th><th>Porcentaje</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+</body>
+</html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 300);
+}
+
+function downloadBlob(content, filename, mimeType) {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function csvEscape(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+
 function bindDentists() {
   const form = document.getElementById("dentistForm");
   const list = document.getElementById("dentistList");
@@ -1053,6 +1194,7 @@ function bindDentists() {
     const data = new FormData(form);
     const id = String(data.get("id") || "").trim();
     const name = String(data.get("name") || "").trim();
+    const percentage = Math.min(100, Math.max(0, Number(data.get("percentage")) || 0));
     const status = data.get("status") === "inactive" ? "inactive" : "active";
     const duplicate = state.dentists.some((dentist) => {
       return dentist.id.toLowerCase() === id.toLowerCase() && dentist.id !== state.editingDentistId;
@@ -1067,10 +1209,10 @@ function bindDentists() {
     if (wasEditing) {
       const index = state.dentists.findIndex((dentist) => dentist.id === state.editingDentistId);
       if (index >= 0) {
-        state.dentists[index] = { id, name, status };
+        state.dentists[index] = { id, name, percentage, status };
       }
     } else {
-      state.dentists.unshift({ id, name, status });
+      state.dentists.unshift({ id, name, percentage, status });
     }
 
     save(storageKeys.dentists, state.dentists);
@@ -1094,6 +1236,7 @@ function bindDentists() {
       state.editingDentistId = dentist.id;
       form.elements.id.value = dentist.id;
       form.elements.name.value = dentist.name;
+      form.elements.percentage.value = dentist.percentage ?? "";
       form.elements.status.value = dentist.status;
       document.getElementById("dentistFormTitle").textContent = "Editar odontologa";
       document.getElementById("saveDentist").textContent = "Guardar cambios";
@@ -1147,7 +1290,7 @@ function renderDentists() {
     card.className = "dentist-card";
     card.dataset.dentistId = dentist.id;
     const isActive = dentist.status === "active";
-    card.innerHTML = '<div class="dentist-card-main"><strong>' + escapeHtml(dentist.name) + '</strong><span>ID: ' + escapeHtml(dentist.id) + '</span></div><span class="dentist-status ' + (isActive ? "active" : "inactive") + '">' + (isActive ? "Activa" : "Inactiva") + '</span><div class="dentist-card-actions"><button type="button" class="ghost-button" data-dentist-action="edit">Editar</button><button type="button" class="danger-button" data-dentist-action="delete">Eliminar</button></div>';
+    card.innerHTML = '<div class="dentist-card-main"><strong>' + escapeHtml(dentist.name) + '</strong><span>ID: ' + escapeHtml(dentist.id) + '</span></div><span class="dentist-percentage">' + (dentist.percentage ?? 0) + '%</span><span class="dentist-status ' + (isActive ? "active" : "inactive") + '">' + (isActive ? "Activa" : "Inactiva") + '</span><div class="dentist-card-actions"><button type="button" class="ghost-button" data-dentist-action="edit">Editar</button><button type="button" class="danger-button" data-dentist-action="delete">Eliminar</button></div>';
     list.appendChild(card);
   });
 }

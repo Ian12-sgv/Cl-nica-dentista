@@ -1385,7 +1385,8 @@ textarea:focus {
   color: rgba(255, 255, 255, 0.7);
 }
 
-.percentage-table input {
+.percentage-table input,
+.percentage-table select {
   padding: 8px 10px;
 }
 
@@ -1584,6 +1585,12 @@ textarea:focus {
 .report-modal-header p {
   color: #64748b;
   margin: 0;
+}
+
+.report-modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 .modal-close {
@@ -1832,7 +1839,7 @@ textarea:focus {
   border-radius: var(--radius);
   display: grid;
   gap: 14px;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   padding: 14px 16px;
 }
 
@@ -1849,6 +1856,16 @@ textarea:focus {
 .dentist-card-main span {
   color: #64748b;
   font-size: 0.82rem;
+}
+
+.dentist-percentage {
+  background: #e0e7ff;
+  border-radius: 999px;
+  color: #3730a3;
+  font-size: 0.76rem;
+  font-weight: 800;
+  padding: 5px 10px;
+  white-space: nowrap;
 }
 
 .dentist-status {

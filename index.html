@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Consultorio Dental</title>
-    <link rel="stylesheet" href="styles.css?v=20260727-46" />
+    <link rel="stylesheet" href="styles.css?v=20260809-2" />
   </head>
   <body>
     <div class="app-shell" id="appShell" data-view="registro">
@@ -152,6 +152,7 @@
                 <form id="dentistForm" class="dentist-form">
                   <label>ID<input name="id" required maxlength="30" autocomplete="off" /></label>
                   <label>Nombre<input name="name" required maxlength="100" autocomplete="off" /></label>
+                  <label>Porcentaje<input name="percentage" type="number" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Ej: 50" required /></label>
                   <label>Status
                     <select name="status" required>
                       <option value="active">Activa</option>
@@ -320,11 +321,15 @@
           </div>
           <button type="button" class="modal-close" data-close-report-modal aria-label="Cerrar detalle" title="Cerrar">&#215;</button>
         </header>
+        <div class="report-modal-actions">
+          <button type="button" class="ghost-button" data-export-report="excel">Descargar Excel</button>
+          <button type="button" class="ghost-button" data-export-report="pdf">Descargar PDF</button>
+        </div>
         <div id="percentageReportContent"></div>
       </section>
     </div>
 
-    <script src="app.js?v=20260727-49"></script>
+    <script src="app.js?v=20260809-7"></script>
   </body>
 </html>
 
