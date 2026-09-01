@@ -18,6 +18,9 @@ const state = {
   financeMonth: getMonthValue(new Date()),
   percentageCurrencyMode: "USD",
   lastReport: null,
+  editingPercentageId: null,
+  editingFinanceId: null,
+  lastFinanceReport: null,
 };
 
 const odontogramRows = [
@@ -553,12 +556,27 @@ function bindPercentages() {
   form.elements.dentistCount.addEventListener("change", () => renderPercentageRows());
   form.elements.exchangeRate.addEventListener("input", handlePercentageExchangeRateChange);
   document.getElementById("savedPercentages").addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-report]");
+    const deleteButton = event.target.closest("[data-delete-report]");
+    if (editButton) {
+      editSavedPercentage(editButton.dataset.editReport);
+      return;
+    }
+    if (deleteButton) {
+      deleteSavedPercentage(deleteButton.dataset.deleteReport);
+      return;
+    }
     const report = event.target.closest("[data-report-id]");
     const monthReport = event.target.closest("[data-month-report]");
     const monthToggle = event.target.closest("[data-month-toggle]");
     if (report) openPercentageReport(report.dataset.reportId);
     if (monthReport) openMonthlyPercentageReport(monthReport.dataset.monthReport);
     if (monthToggle) toggleMonthlyReports(monthToggle);
+  });
+  document.getElementById("cancelPercentageEdit").addEventListener("click", () => {
+    resetPercentageEdit();
+    clearPercentageInputs();
+    setPercentageMessage("Edición cancelada.");
   });
   document.getElementById("percentageReportModal").addEventListener("click", (event) => {
     if (event.target.id === "percentageReportModal" || event.target.closest("[data-close-report-modal]")) {
@@ -586,21 +604,78 @@ function bindPercentages() {
       return;
     }
 
-    state.percentages.unshift({
-      id: crypto.randomUUID(),
+    const payload = {
       date: form.elements.date.value,
       income,
       exchangeRate: getExchangeRate(),
       incomeVes,
       currencyMode: state.percentageCurrencyMode,
       rows,
-    });
+    };
+
+    const wasEditing = Boolean(state.editingPercentageId);
+    if (wasEditing) {
+      const index = state.percentages.findIndex((item) => item.id === state.editingPercentageId);
+      if (index >= 0) state.percentages[index] = { ...state.percentages[index], ...payload };
+    } else {
+      state.percentages.unshift({ id: crypto.randomUUID(), ...payload });
+    }
+
     save(storageKeys.percentages, state.percentages);
     renderSavedPercentages();
+    resetPercentageEdit();
     clearPercentageInputs();
-    setPercentageMessage("Reparto guardado correctamente.");
+    setPercentageMessage(wasEditing ? "Reparto actualizado correctamente." : "Reparto guardado correctamente.");
   });
   setPercentageCurrencyMode(state.percentageCurrencyMode);
+}
+
+function editSavedPercentage(id) {
+  const entry = state.percentages.find((item) => item.id === id);
+  if (!entry) return;
+
+  state.editingPercentageId = id;
+  const form = document.getElementById("percentageForm");
+  form.elements.date.value = entry.date || "";
+  setPercentageCurrencyMode(entry.currencyMode === "VES" ? "VES" : "USD");
+  form.elements.exchangeRate.value = entry.exchangeRate || "";
+
+  const body = document.getElementById("percentageRows");
+  body.innerHTML = "";
+  const clinicData = entry.rows[0] || { name: "Clinica", amount: 0, amountVes: 0 };
+  createPercentageRow(body, clinicData, true);
+  entry.rows.slice(1).forEach((row) => {
+    const matchedDentist = state.dentists.find((dentist) => dentist.id === row.dentistId || dentist.name === row.name);
+    createPercentageRow(body, { name: row.name, dentistId: matchedDentist ? matchedDentist.id : "" });
+  });
+  updateDentistCount();
+  handlePercentageExchangeRateChange();
+
+  document.getElementById("cancelPercentageEdit").hidden = false;
+  document.getElementById("savePercentage").textContent = "Actualizar reparto";
+  setPercentageMessage(`Editando el reparto del ${entry.date}.`);
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deleteSavedPercentage(id) {
+  const entry = state.percentages.find((item) => item.id === id);
+  if (!entry) return;
+  if (!window.confirm(`Eliminar el reparto del ${entry.date}? Esta accion no se puede deshacer.`)) return;
+
+  state.percentages = state.percentages.filter((item) => item.id !== id);
+  save(storageKeys.percentages, state.percentages);
+  if (state.editingPercentageId === id) {
+    resetPercentageEdit();
+    clearPercentageInputs();
+  }
+  renderSavedPercentages();
+  setPercentageMessage("Reparto eliminado correctamente.");
+}
+
+function resetPercentageEdit() {
+  state.editingPercentageId = null;
+  document.getElementById("cancelPercentageEdit").hidden = true;
+  document.getElementById("savePercentage").textContent = "Guardar reparto";
 }
 
 function renderPercentageRows() {
@@ -898,23 +973,29 @@ function renderSavedPercentages() {
           <button type="button" class="monthly-report-button" data-month-report="${group.key}">Reporte general del mes</button>
         </header>
         <div id="monthly-reports-${group.key}" class="monthly-report-items" hidden>
-          ${group.entries.map((entry) => `
-            <button type="button" class="saved-percentage-item" data-report-id="${entry.id}">
-              <div><strong>${escapeHtml(entry.date)}</strong><span>${entry.rows.length - 1} odontologas</span></div>
-              <strong>${formatUsd(entry.income)} - ${formatVes(entry.incomeVes || 0)}</strong>
-            </button>
-          `).join("")}
+          ${group.entries.map((entry) => renderSavedPercentageItem(entry)).join("")}
         </div>
       </section>
     `).join("");
     return;
   }
-  list.innerHTML = state.percentages.map((entry) => `
-    <button type="button" class="saved-percentage-item" data-report-id="${entry.id}">
-      <div><strong>${escapeHtml(entry.date)}</strong><span>${entry.rows.length - 1} odontologas</span></div>
-      <strong>${formatUsd(entry.income)} · ${formatVes(entry.incomeVes || 0)}</strong>
-    </button>
-  `).join("");
+  list.innerHTML = state.percentages.map((entry) => renderSavedPercentageItem(entry)).join("");
+}
+
+function renderSavedPercentageItem(entry) {
+  const dentistNames = entry.rows.slice(1).map((row) => row.name || "Sin asignar").join(", ") || "Sin odontologas";
+  return `
+    <div class="saved-percentage-item">
+      <button type="button" class="saved-percentage-info" data-report-id="${entry.id}">
+        <div><strong>${escapeHtml(entry.date)}</strong><span>${escapeHtml(dentistNames)}</span></div>
+        <strong>${formatUsd(entry.income)} · ${formatVes(entry.incomeVes || 0)}</strong>
+      </button>
+      <div class="saved-percentage-actions">
+        <button type="button" class="ghost-button" data-edit-report="${entry.id}">Editar</button>
+        <button type="button" class="danger-button" data-delete-report="${entry.id}">Eliminar</button>
+      </div>
+    </div>
+  `;
 }
 
 function groupReportsByMonth(reports) {
@@ -1305,6 +1386,12 @@ function bindFinance() {
     monthInput.value = state.financeMonth;
     renderFinance();
   });
+  document.querySelectorAll("[data-export-finance]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.exportFinance === "excel") exportFinanceReportToCsv();
+      if (button.dataset.exportFinance === "pdf") exportFinanceReportToPdf();
+    });
+  });
   const patientSearch = document.getElementById("financePatientSearch");
   patientSearch.addEventListener("input", renderFinancePatients);
   patientSearch.addEventListener("keydown", (event) => {
@@ -1326,8 +1413,7 @@ function bindFinance() {
       showStatus("Agrega un monto USD o VES.");
       return;
     }
-    state.finances.unshift({
-      id: crypto.randomUUID(),
+    const payload = {
       type: data.type,
       description: data.description,
       category: data.category,
@@ -1335,14 +1421,41 @@ function bindFinance() {
       amountUsd,
       amountVes,
       patientId: data.patientId,
-    });
+    };
+
+    const wasEditing = Boolean(state.editingFinanceId);
+    if (wasEditing) {
+      const index = state.finances.findIndex((item) => item.id === state.editingFinanceId);
+      if (index >= 0) state.finances[index] = { ...state.finances[index], ...payload };
+    } else {
+      state.finances.unshift({ id: crypto.randomUUID(), ...payload });
+    }
+
     save(storageKeys.finances, state.finances);
     event.currentTarget.reset();
     setTodayDefaults();
+    resetFinanceEdit();
     renderFinanceCategories();
     renderFinancePatients();
     renderFinanceMonthOptions();
     renderFinance();
+    showStatus(wasEditing ? "Movimiento actualizado." : "Movimiento registrado.");
+  });
+
+  document.getElementById("financeList").addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-finance]");
+    const deleteButton = event.target.closest("[data-delete-finance]");
+    if (editButton) editFinance(editButton.dataset.editFinance);
+    if (deleteButton) deleteFinance(deleteButton.dataset.deleteFinance);
+  });
+
+  document.getElementById("cancelFinanceEdit").addEventListener("click", () => {
+    document.getElementById("financeForm").reset();
+    setTodayDefaults();
+    resetFinanceEdit();
+    renderFinanceCategories();
+    renderFinancePatients();
+    showStatus("Edición cancelada.");
   });
 
   document.querySelectorAll(".finance-filter").forEach((button) => {
@@ -1353,6 +1466,56 @@ function bindFinance() {
       renderFinance();
     });
   });
+}
+
+function editFinance(id) {
+  const entry = state.finances.find((item) => item.id === id);
+  if (!entry) return;
+
+  state.editingFinanceId = id;
+  const form = document.getElementById("financeForm");
+  form.elements.type.value = entry.type;
+  renderFinanceCategories();
+  form.elements.category.value = entry.category || "";
+  form.elements.date.value = entry.date || "";
+  form.elements.description.value = entry.description || "";
+  form.elements.amountUsd.value = entry.amountUsd || "";
+  form.elements.amountVes.value = entry.amountVes || "";
+
+  const patient = state.patients.find((item) => item.id === entry.patientId);
+  document.getElementById("financePatientSearch").value = patient ? patient.idNumber || "" : "";
+  renderFinancePatients();
+  form.elements.patientId.value = entry.patientId || "";
+
+  document.getElementById("cancelFinanceEdit").hidden = false;
+  document.getElementById("saveFinance").textContent = "Actualizar movimiento";
+  showStatus(`Editando movimiento: ${entry.description}`);
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function deleteFinance(id) {
+  const entry = state.finances.find((item) => item.id === id);
+  if (!entry) return;
+  if (!window.confirm(`Eliminar el movimiento "${entry.description}"? Esta accion no se puede deshacer.`)) return;
+
+  state.finances = state.finances.filter((item) => item.id !== id);
+  save(storageKeys.finances, state.finances);
+  if (state.editingFinanceId === id) {
+    document.getElementById("financeForm").reset();
+    setTodayDefaults();
+    resetFinanceEdit();
+    renderFinanceCategories();
+    renderFinancePatients();
+  }
+  renderFinanceMonthOptions();
+  renderFinance();
+  showStatus("Movimiento eliminado.");
+}
+
+function resetFinanceEdit() {
+  state.editingFinanceId = null;
+  document.getElementById("cancelFinanceEdit").hidden = true;
+  document.getElementById("saveFinance").textContent = "+ Registrar";
 }
 
 function renderFinanceCategories() {
@@ -1413,10 +1576,17 @@ function normalizePatientId(value) {
 function renderFinance() {
   const filtered = state.finances.filter((item) => isInsideSelectedPeriod(item.date, state.financeFilter, state.financeMonth));
   const totals = { incomeUsd: 0, expenseUsd: 0, incomeVes: 0, expenseVes: 0 };
+  const incomeByCategory = new Map();
+  const expenseByCategory = new Map();
 
   filtered.forEach((item) => {
     const amountUsd = getFinanceAmount(item, "USD");
     const amountVes = getFinanceAmount(item, "VES");
+    const byCategory = item.type === "income" ? incomeByCategory : expenseByCategory;
+    const bucket = byCategory.get(item.category) || { usd: 0, ves: 0 };
+    bucket.usd += amountUsd;
+    bucket.ves += amountVes;
+    byCategory.set(item.category, bucket);
     if (item.type === "income") {
       totals.incomeUsd += amountUsd;
       totals.incomeVes += amountVes;
@@ -1432,6 +1602,24 @@ function renderFinance() {
   document.getElementById("incomeVes").textContent = formatVes(totals.incomeVes);
   document.getElementById("expenseVes").textContent = formatVes(totals.expenseVes);
   document.getElementById("balanceVes").textContent = formatVes(totals.incomeVes - totals.expenseVes);
+  renderCategoryBreakdown("incomeByCategory", incomeByCategory);
+  renderCategoryBreakdown("expenseByCategory", expenseByCategory);
+
+  state.lastFinanceReport = {
+    periodLabel: getFinancePeriodLabel(),
+    totals,
+    incomeByCategory: Array.from(incomeByCategory.entries()),
+    expenseByCategory: Array.from(expenseByCategory.entries()),
+    movements: filtered.map((item) => ({
+      date: item.date,
+      type: item.type,
+      categoryLabel: getFinanceCategoryLabel(item),
+      description: item.description,
+      patientName: (state.patients.find((patient) => patient.id === item.patientId) || {}).name || "",
+      amountUsd: getFinanceAmount(item, "USD"),
+      amountVes: getFinanceAmount(item, "VES"),
+    })),
+  };
 
   const list = document.getElementById("financeList");
   list.innerHTML = filtered.length ? "" : '<div class="empty-state">Sin movimientos en este periodo.</div>';
@@ -1441,7 +1629,13 @@ function renderFinance() {
     const patient = state.patients.find((entry) => entry.id === item.patientId);
     movement.innerHTML = `
       <div><strong>${escapeHtml(item.description)}</strong><span>${escapeHtml(item.date)} - ${item.type === "income" ? "Ingreso" : "Egreso"} - ${escapeHtml(getFinanceCategoryLabel(item))}${patient ? ` - ${escapeHtml(patient.name)}` : ""}</span></div>
-      <strong>${formatUsd(getFinanceAmount(item, "USD"))} - ${formatVes(getFinanceAmount(item, "VES"))}</strong>
+      <div class="movement-end">
+        <strong>${formatUsd(getFinanceAmount(item, "USD"))} · ${formatVes(getFinanceAmount(item, "VES"))}</strong>
+        <div class="movement-actions">
+          <button type="button" class="ghost-button" data-edit-finance="${item.id}">Editar</button>
+          <button type="button" class="danger-button" data-delete-finance="${item.id}">Eliminar</button>
+        </div>
+      </div>
     `;
     list.appendChild(movement);
   });
@@ -1457,6 +1651,27 @@ function getFinanceCategoryLabel(item) {
     otro_egreso: "Otro egreso",
   };
   return labels[item.category] || "Sin categoria";
+}
+
+function renderCategoryBreakdown(containerId, totalsByCategory) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const entries = Array.from(totalsByCategory.entries()).filter(([, value]) => value.usd || value.ves);
+
+  if (!entries.length) {
+    container.innerHTML = '<div class="empty-state compact-visible">Sin movimientos en este periodo.</div>';
+    return;
+  }
+
+  container.innerHTML = entries
+    .sort(([, a], [, b]) => (b.usd + b.ves) - (a.usd + a.ves))
+    .map(([category, value]) => `
+      <div class="category-breakdown-row">
+        <span>${escapeHtml(getFinanceCategoryLabel({ category }))}</span>
+        <strong>${formatUsd(value.usd)} · ${formatVes(value.ves)}</strong>
+      </div>
+    `)
+    .join("");
 }
 
 function getFinanceAmount(item, currency) {
@@ -1505,12 +1720,147 @@ function isInsideSelectedPeriod(dateString, filter, monthValue) {
   return currentHalf === itemHalf;
 }
 
+function getFinancePeriodLabel() {
+  const [year, month] = String(state.financeMonth || "").split("-").map(Number);
+  const monthLabel = year && month
+    ? new Intl.DateTimeFormat("es-VE", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(year, month - 1, 1)))
+    : "";
+  const capitalizedMonth = monthLabel ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1) : "";
+  if (state.financeFilter === "monthly") return `${capitalizedMonth} - Mes completo`;
+  const currentHalf = new Date().getDate() <= 15 ? "Quincena 1 (1-15)" : "Quincena 2 (16-fin)";
+  return `${capitalizedMonth} - ${currentHalf}`;
+}
+
+function exportFinanceReportToCsv() {
+  const report = state.lastFinanceReport;
+  if (!report) return;
+  const netUsd = report.totals.incomeUsd - report.totals.expenseUsd;
+  const netVes = report.totals.incomeVes - report.totals.expenseVes;
+  const lines = [];
+
+  lines.push(["Balance Financiero", csvEscape(report.periodLabel)].join(","));
+  lines.push("");
+  lines.push(["Resumen", "USD", "VES"].map(csvEscape).join(","));
+  lines.push(["Ingresos", report.totals.incomeUsd.toFixed(2), report.totals.incomeVes.toFixed(2)].join(","));
+  lines.push(["Egresos", report.totals.expenseUsd.toFixed(2), report.totals.expenseVes.toFixed(2)].join(","));
+  lines.push(["Neto", netUsd.toFixed(2), netVes.toFixed(2)].join(","));
+  lines.push("");
+
+  lines.push(csvEscape("Ingresos por categoria"));
+  lines.push(["Categoria", "USD", "VES"].map(csvEscape).join(","));
+  report.incomeByCategory.forEach(([category, value]) => {
+    lines.push([csvEscape(getFinanceCategoryLabel({ category })), value.usd.toFixed(2), value.ves.toFixed(2)].join(","));
+  });
+  lines.push("");
+
+  lines.push(csvEscape("Egresos por categoria"));
+  lines.push(["Categoria", "USD", "VES"].map(csvEscape).join(","));
+  report.expenseByCategory.forEach(([category, value]) => {
+    lines.push([csvEscape(getFinanceCategoryLabel({ category })), value.usd.toFixed(2), value.ves.toFixed(2)].join(","));
+  });
+  lines.push("");
+
+  lines.push(csvEscape("Movimientos del periodo"));
+  lines.push(["Fecha", "Tipo", "Categoria", "Concepto", "Paciente", "USD", "VES"].map(csvEscape).join(","));
+  report.movements.forEach((item) => {
+    lines.push([
+      csvEscape(item.date),
+      csvEscape(item.type === "income" ? "Ingreso" : "Egreso"),
+      csvEscape(item.categoryLabel),
+      csvEscape(item.description),
+      csvEscape(item.patientName),
+      item.amountUsd.toFixed(2),
+      item.amountVes.toFixed(2),
+    ].join(","));
+  });
+
+  downloadBlob("﻿" + lines.join("\r\n"), `balance-financiero-${state.financeMonth}.csv`, "text/csv;charset=utf-8;");
+}
+
+function exportFinanceReportToPdf() {
+  const report = state.lastFinanceReport;
+  if (!report) return;
+  const netUsd = report.totals.incomeUsd - report.totals.expenseUsd;
+  const netVes = report.totals.incomeVes - report.totals.expenseVes;
+
+  const categoryRows = (entries) => entries.map(([category, value]) => `
+    <tr><td>${escapeHtml(getFinanceCategoryLabel({ category }))}</td><td>${formatUsd(value.usd)}</td><td>${formatVes(value.ves)}</td></tr>
+  `).join("");
+
+  const movementRows = report.movements.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.date)}</td>
+      <td>${item.type === "income" ? "Ingreso" : "Egreso"}</td>
+      <td>${escapeHtml(item.categoryLabel)}</td>
+      <td>${escapeHtml(item.description)}</td>
+      <td>${escapeHtml(item.patientName)}</td>
+      <td>${formatUsd(item.amountUsd)}</td>
+      <td>${formatVes(item.amountVes)}</td>
+    </tr>
+  `).join("");
+
+  const printWindow = window.open("", "_blank", "width=900,height=700");
+  if (!printWindow) {
+    showStatus("El navegador bloqueo la ventana de impresion. Habilita las ventanas emergentes.");
+    return;
+  }
+  printWindow.document.write(`<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<title>Balance Financiero</title>
+<style>
+  body { font-family: Arial, sans-serif; padding: 24px; color: #0f172a; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; }
+  p { color: #475569; margin-top: 0; }
+  table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+  th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; font-size: 0.85rem; }
+  th { background: #f1f5f9; }
+</style>
+</head>
+<body>
+  <h1>Balance Financiero</h1>
+  <p>${escapeHtml(report.periodLabel)}</p>
+  <table>
+    <thead><tr><th>Resumen</th><th>USD</th><th>VES</th></tr></thead>
+    <tbody>
+      <tr><td>Ingresos</td><td>${formatUsd(report.totals.incomeUsd)}</td><td>${formatVes(report.totals.incomeVes)}</td></tr>
+      <tr><td>Egresos</td><td>${formatUsd(report.totals.expenseUsd)}</td><td>${formatVes(report.totals.expenseVes)}</td></tr>
+      <tr><td><strong>Neto</strong></td><td><strong>${formatUsd(netUsd)}</strong></td><td><strong>${formatVes(netVes)}</strong></td></tr>
+    </tbody>
+  </table>
+
+  <h2>Ingresos por categoria</h2>
+  <table>
+    <thead><tr><th>Categoria</th><th>USD</th><th>VES</th></tr></thead>
+    <tbody>${categoryRows(report.incomeByCategory) || '<tr><td colspan="3">Sin movimientos</td></tr>'}</tbody>
+  </table>
+
+  <h2>Egresos por categoria</h2>
+  <table>
+    <thead><tr><th>Categoria</th><th>USD</th><th>VES</th></tr></thead>
+    <tbody>${categoryRows(report.expenseByCategory) || '<tr><td colspan="3">Sin movimientos</td></tr>'}</tbody>
+  </table>
+
+  <h2>Movimientos del periodo</h2>
+  <table>
+    <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoria</th><th>Concepto</th><th>Paciente</th><th>USD</th><th>VES</th></tr></thead>
+    <tbody>${movementRows || '<tr><td colspan="7">Sin movimientos</td></tr>'}</tbody>
+  </table>
+</body>
+</html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 300);
+}
+
 function formatUsd(value) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value);
 }
 
 function formatVes(value) {
-  return `Bs. ${new Intl.NumberFormat("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)}`;
+  return `Bs. ${new Intl.NumberFormat("es-VE", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)}`;
 }
 
 function showStatus(message) {

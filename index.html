@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Consultorio Dental</title>
-    <link rel="stylesheet" href="styles.css?v=20260809-2" />
+    <link rel="stylesheet" href="styles.css?v=20260809-12" />
   </head>
   <body>
     <div class="app-shell" id="appShell" data-view="registro">
@@ -216,10 +216,26 @@
             </section>
 
             <section class="finance-panel">
-              <h2>Balance neto</h2>
+              <div class="finance-panel-header">
+                <h2>Balance neto</h2>
+                <div class="finance-report-actions">
+                  <button type="button" class="ghost-button" data-export-finance="excel">Descargar Excel</button>
+                  <button type="button" class="ghost-button" data-export-finance="pdf">Descargar PDF</button>
+                </div>
+              </div>
               <div class="net-balance">
                 <div><span>Neto USD</span><strong id="balanceUsd">$0.00</strong></div>
                 <div><span>Neto VES</span><strong id="balanceVes">Bs 0.00</strong></div>
+              </div>
+              <div class="category-breakdown">
+                <div class="category-breakdown-group">
+                  <h3>Ingresos por categoria</h3>
+                  <div id="incomeByCategory" class="category-breakdown-list"></div>
+                </div>
+                <div class="category-breakdown-group">
+                  <h3>Egresos por categoria</h3>
+                  <div id="expenseByCategory" class="category-breakdown-list"></div>
+                </div>
               </div>
             </section>
 
@@ -245,7 +261,10 @@
                     <option value="">Sin asociar</option>
                   </select>
                 </label>
-                <button type="submit" class="primary-button">+ Registrar</button>
+                <div class="finance-form-actions">
+                  <button type="button" id="cancelFinanceEdit" class="ghost-button" hidden>Cancelar edición</button>
+                  <button type="submit" id="saveFinance" class="primary-button">+ Registrar</button>
+                </div>
               </form>
             </section>
 
@@ -299,7 +318,8 @@
               <button type="button" id="addDentistLine" class="add-dentist-button">+ Agregar odontologa</button>
               <p id="percentageMessage" class="percentage-message">Ingresa los montos de cada beneficiario. El total se calcula abajo.</p>
               <div class="actions">
-                <button type="submit" class="primary-button">Guardar reparto</button>
+                <button type="button" id="cancelPercentageEdit" class="ghost-button" hidden>Cancelar edición</button>
+                <button type="submit" id="savePercentage" class="primary-button">Guardar reparto</button>
               </div>
             </form>
 
@@ -329,7 +349,7 @@
       </section>
     </div>
 
-    <script src="app.js?v=20260809-7"></script>
+    <script src="app.js?v=20260809-13"></script>
   </body>
 </html>
 
