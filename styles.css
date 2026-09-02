@@ -713,8 +713,26 @@ textarea:focus {
   display: inline-flex;
   font-weight: 800;
   gap: 8px;
-  justify-self: start;
   padding: 0;
+}
+
+.patient-detail-toolbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.patient-edit-form {
+  display: grid;
+  gap: 24px;
+}
+
+@media (max-width: 560px) {
+  .patient-detail-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 
 .patient-detail-header h1 {
@@ -921,11 +939,29 @@ textarea:focus {
   z-index: 1;
 }
 
+.timeline-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  justify-content: space-between;
+}
+
+.timeline-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
 .timeline-item time {
   color: #64748b;
   display: block;
   font-size: 0.85rem;
   margin-bottom: 4px;
+}
+
+.timeline-header time {
+  margin-bottom: 0;
 }
 
 .timeline-item strong {

@@ -142,12 +142,54 @@ function bindPatientForm() {
   });
 
   document.getElementById("addTreatment").addEventListener("click", () => addTreatmentRow());
+
+  form.addEventListener("keydown", (event) => {
+    const target = event.target;
+    if (!target.matches("input, select, textarea")) return;
+    const isTextarea = target.tagName === "TEXTAREA";
+
+    if (event.key === "Enter") {
+      if (isTextarea) return;
+      event.preventDefault();
+      focusPatientFormField(form, target, 1);
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      if (isTextarea) {
+        const atStart = target.selectionStart === 0 && target.selectionEnd === 0;
+        const atEnd = target.selectionStart === target.value.length && target.selectionEnd === target.value.length;
+        if (event.key === "ArrowDown" && !atEnd) return;
+        if (event.key === "ArrowUp" && !atStart) return;
+      }
+      event.preventDefault();
+      focusPatientFormField(form, target, event.key === "ArrowDown" ? 1 : -1);
+    }
+  });
 }
 
-function bindOdontogramTools() {
-  document.querySelectorAll(".odontogram-tool").forEach((button) => {
+function focusPatientFormField(form, current, direction) {
+  const fields = Array.from(form.querySelectorAll("input, select, textarea")).filter(
+    (field) => !field.disabled && field.type !== "hidden" && field.offsetParent !== null
+  );
+  const index = fields.indexOf(current);
+  if (index === -1) return;
+  const next = fields[index + direction];
+  if (!next) return;
+  next.focus();
+  if (typeof next.select === "function") {
+    try {
+      next.select();
+    } catch {
+      // ignore selection errors on non-text fields
+    }
+  }
+}
+
+function bindOdontogramTools(scope = document) {
+  scope.querySelectorAll(".odontogram-tool").forEach((button) => {
     button.addEventListener("click", () => {
-      document.querySelectorAll(".odontogram-tool").forEach((item) => item.classList.remove("active"));
+      scope.querySelectorAll(".odontogram-tool").forEach((item) => item.classList.remove("active"));
       button.classList.add("active");
       state.selectedTool = button.dataset.tool;
       state.selectedColor = button.dataset.color;
@@ -156,40 +198,50 @@ function bindOdontogramTools() {
 }
 
 function renderOdontogram() {
-  const odontogram = document.getElementById("odontogram");
+  renderOdontogramEditor("odontogram", state.odontogramMarks);
+  document.getElementById("odontogramInput").value = JSON.stringify(state.odontogramMarks);
+}
+
+function renderOdontogramEditor(containerId, marks) {
+  const odontogram = document.getElementById(containerId);
+  if (!odontogram) return;
   odontogram.innerHTML = "";
 
   odontogramRows.forEach((row) => {
     const rowElement = document.createElement("div");
     rowElement.className = `tooth-row ${row.type} ${row.arch}`;
-    row.teeth.forEach((toothId) => rowElement.appendChild(createToothButton(toothId)));
+    row.teeth.forEach((toothId) => rowElement.appendChild(createToothButton(toothId, marks, (id, face) => {
+      applyOdontogramTool(marks, id, face);
+      renderOdontogramEditor(containerId, marks);
+      if (containerId === "odontogram") {
+        document.getElementById("odontogramInput").value = JSON.stringify(marks);
+      }
+    })));
     odontogram.appendChild(rowElement);
   });
-
-  document.getElementById("odontogramInput").value = JSON.stringify(state.odontogramMarks);
 }
 
-function createToothButton(toothId) {
+function createToothButton(toothId, marks, onFaceClick) {
   const wrapper = document.createElement("div");
   wrapper.className = "tooth";
   wrapper.innerHTML = `
     <svg class="tooth-chart" viewBox="0 0 100 100" role="group" aria-label="Pieza ${toothId}">
       <circle class="tooth-outline" cx="50" cy="50" r="48"></circle>
-      ${toothSectionPath(toothId, "top", "M50 50 L16 16 A48 48 0 0 1 84 16 Z")}
-      ${toothSectionPath(toothId, "right", "M50 50 L84 16 A48 48 0 0 1 84 84 Z")}
-      ${toothSectionPath(toothId, "bottom", "M50 50 L84 84 A48 48 0 0 1 16 84 Z")}
-      ${toothSectionPath(toothId, "left", "M50 50 L16 84 A48 48 0 0 1 16 16 Z")}
-      ${toothSectionPath(toothId, "center", "", "circle")}
-      ${toothCariesMark(toothId)}
+      ${toothSectionPath(marks, toothId, "top", "M50 50 L16 16 A48 48 0 0 1 84 16 Z")}
+      ${toothSectionPath(marks, toothId, "right", "M50 50 L84 16 A48 48 0 0 1 84 84 Z")}
+      ${toothSectionPath(marks, toothId, "bottom", "M50 50 L84 84 A48 48 0 0 1 16 84 Z")}
+      ${toothSectionPath(marks, toothId, "left", "M50 50 L16 84 A48 48 0 0 1 16 16 Z")}
+      ${toothSectionPath(marks, toothId, "center", "", "circle")}
+      ${toothCariesMark(toothId, marks)}
     </svg>
     <span class="tooth-number">${toothId}</span>
   `;
   wrapper.querySelectorAll(".tooth-face").forEach((face) => {
-    face.addEventListener("click", () => applyOdontogramTool(toothId, face.dataset.face));
+    face.addEventListener("click", () => onFaceClick(toothId, face.dataset.face));
     face.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        applyOdontogramTool(toothId, face.dataset.face);
+        onFaceClick(toothId, face.dataset.face);
       }
     });
   });
@@ -201,29 +253,28 @@ function toothCariesMark(toothId, marks = state.odontogramMarks) {
   return '<g class="tooth-caries-mark ' + color + '" aria-hidden="true"><line class="caries-outline" x1="18" y1="18" x2="82" y2="82"></line><line class="caries-outline" x1="82" y1="18" x2="18" y2="82"></line><line class="caries-line" x1="18" y1="18" x2="82" y2="82"></line><line class="caries-line" x1="82" y1="18" x2="18" y2="82"></line></g>';
 }
 
-function applyOdontogramTool(toothId, face) {
+function applyOdontogramTool(marks, toothId, face) {
   if (state.selectedTool === "caries") {
-    toggleToothCaries(toothId);
+    toggleToothCaries(marks, toothId);
     return;
   }
-  paintToothFace(toothId, face);
+  paintToothFace(marks, toothId, face);
 }
 
-function toggleToothCaries(toothId) {
-  state.odontogramMarks[toothId] = state.odontogramMarks[toothId] || {};
-  if (state.odontogramMarks[toothId].caries === state.selectedColor) {
-    delete state.odontogramMarks[toothId].caries;
+function toggleToothCaries(marks, toothId) {
+  marks[toothId] = marks[toothId] || {};
+  if (marks[toothId].caries === state.selectedColor) {
+    delete marks[toothId].caries;
   } else {
-    state.odontogramMarks[toothId].caries = state.selectedColor;
+    marks[toothId].caries = state.selectedColor;
   }
-  if (Object.keys(state.odontogramMarks[toothId]).length === 0) {
-    delete state.odontogramMarks[toothId];
+  if (Object.keys(marks[toothId]).length === 0) {
+    delete marks[toothId];
   }
-  renderOdontogram();
 }
 
-function toothSectionPath(toothId, face, path, shape = "path") {
-  const color = state.odontogramMarks[toothId]?.[face] || "";
+function toothSectionPath(marks, toothId, face, path, shape = "path") {
+  const color = marks?.[toothId]?.[face] || "";
   const colorClass = color ? ` ${color}` : "";
   const label = `Pieza ${toothId}, cara ${face}`;
   if (shape === "circle") {
@@ -232,17 +283,16 @@ function toothSectionPath(toothId, face, path, shape = "path") {
   return `<path class="tooth-face${colorClass}" data-face="${face}" role="button" tabindex="0" aria-label="${label}" d="${path}"></path>`;
 }
 
-function paintToothFace(toothId, face) {
-  state.odontogramMarks[toothId] = state.odontogramMarks[toothId] || {};
-  if (state.odontogramMarks[toothId][face] === state.selectedColor) {
-    delete state.odontogramMarks[toothId][face];
+function paintToothFace(marks, toothId, face) {
+  marks[toothId] = marks[toothId] || {};
+  if (marks[toothId][face] === state.selectedColor) {
+    delete marks[toothId][face];
   } else {
-    state.odontogramMarks[toothId][face] = state.selectedColor;
+    marks[toothId][face] = state.selectedColor;
   }
-  if (Object.keys(state.odontogramMarks[toothId]).length === 0) {
-    delete state.odontogramMarks[toothId];
+  if (Object.keys(marks[toothId]).length === 0) {
+    delete marks[toothId];
   }
-  renderOdontogram();
 }
 
 function addTreatmentRow(treatment = "", cost = "") {
@@ -314,19 +364,28 @@ function getInitial(value) {
   return String(value || "P").trim().charAt(0).toUpperCase() || "P";
 }
 
-function renderPatientProfile(patientId) {
+function renderPatientProfile(patientId, options = {}) {
   const patient = state.patients.find((item) => item.id === patientId);
   const profile = document.getElementById("patientProfile");
   if (!patient) return;
   document.getElementById("historyListView").hidden = true;
   document.getElementById("historyDetailView").hidden = false;
 
+  const isEditingDetails = Boolean(options.editingDetails);
+  const isEditingOdontogram = Boolean(options.editingOdontogram);
+  const editingEvolutionIndex = options.editingEvolutionIndex ?? null;
   const evolution = patient.evolution?.length
-    ? patient.evolution.map((item) => `
+    ? patient.evolution.map((item, index) => `
       <div class="timeline-item">
         <span class="timeline-dot"></span>
-        <div>
-          <time>${escapeHtml(item.date)}</time>
+        <div class="timeline-body">
+          <div class="timeline-header">
+            <time>${escapeHtml(item.date)}</time>
+            <div class="timeline-actions">
+              <button type="button" class="ghost-button" data-edit-evolution="${index}">Editar</button>
+              <button type="button" class="danger-button" data-delete-evolution="${index}">Eliminar</button>
+            </div>
+          </div>
           <strong>${escapeHtml(item.procedure || "Consulta")}</strong>
           <p>${escapeHtml(item.note)}</p>
         </div>
@@ -337,7 +396,10 @@ function renderPatientProfile(patientId) {
 
   profile.className = "patient-detail";
   profile.innerHTML = `
-    <button type="button" class="back-link" id="backToHistory">← Volver al listado</button>
+    <div class="patient-detail-toolbar">
+      <button type="button" class="back-link" id="backToHistory">← Volver al listado</button>
+      <button type="button" class="danger-button" id="deletePatientButton">Eliminar paciente</button>
+    </div>
 
     <header class="patient-detail-header">
       <h1>${escapeHtml(patient.name)}</h1>
@@ -345,24 +407,48 @@ function renderPatientProfile(patientId) {
     </header>
 
     <section class="detail-card">
-      <h2>Datos del paciente</h2>
-      <div class="detail-grid">
-        ${detailField("Telefono", patient.phone)}
-        ${detailField("Direccion", patient.address)}
-        ${detailField("Grupo sanguineo", patient.bloodGroup)}
-        ${detailField("Fecha registro", patient.date)}
-        ${detailField("APP", patient.app)}
-        ${detailField("APF", patient.apf)}
-        ${detailField("AH", patient.ah)}
-        ${detailField("RM", patient.rm)}
-        ${detailField("Habitos", patient.habits)}
-        ${detailField("Examen bucal", patient.oralExam)}
+      <div class="section-head">
+        <h2>Datos del paciente</h2>
+        ${isEditingDetails ? "" : '<button type="button" class="ghost-button" id="editPatientButton">Editar</button>'}
       </div>
+      ${isEditingDetails ? renderPatientEditForm(patient) : `
+        <div class="detail-grid">
+          ${detailField("Telefono", patient.phone)}
+          ${detailField("Direccion", patient.address)}
+          ${detailField("Grupo sanguineo", patient.bloodGroup)}
+          ${detailField("Fecha registro", patient.date)}
+          ${detailField("APP", patient.app)}
+          ${detailField("APF", patient.apf)}
+          ${detailField("AH", patient.ah)}
+          ${detailField("RM", patient.rm)}
+          ${detailField("Habitos", patient.habits)}
+          ${detailField("Examen bucal", patient.oralExam)}
+        </div>
+      `}
     </section>
 
     <section class="detail-card">
-      <h2>Odontodiagrama</h2>
-      <div class="readonly-odontogram">${renderReadonlyOdontogram(patient.odontogram)}</div>
+      <div class="section-head">
+        <h2>Odontodiagrama</h2>
+        ${isEditingOdontogram ? "" : '<button type="button" class="ghost-button" id="editOdontogramButton">Editar</button>'}
+      </div>
+      ${isEditingOdontogram ? `
+        <div class="odontogram-tools">
+          <span>Herramienta:</span>
+          <div class="color-tools" aria-label="Herramienta seleccionada">
+            <button type="button" class="color-option odontogram-tool red active" data-tool="paint" data-color="red"><span></span>Rojo</button>
+            <button type="button" class="color-option odontogram-tool blue" data-tool="paint" data-color="blue"><span></span>Azul</button>
+            <button type="button" class="color-option odontogram-tool red" data-tool="caries" data-color="red"><strong class="caries-tool-symbol" aria-hidden="true">X</strong>X roja - Caries</button>
+            <button type="button" class="color-option odontogram-tool blue" data-tool="caries" data-color="blue"><strong class="caries-tool-symbol" aria-hidden="true">X</strong>X azul - Caries</button>
+          </div>
+          <small>Selecciona un color para pintar una cara o una X para marcar caries en toda la pieza.</small>
+        </div>
+        <div id="historyOdontogram" class="odontogram" aria-label="Odontodiagrama interactivo"></div>
+        <div class="actions">
+          <button type="button" class="ghost-button" id="cancelOdontogramEdit">Cancelar</button>
+          <button type="button" class="primary-button" id="saveOdontogramEdit">Guardar cambios</button>
+        </div>
+      ` : `<div class="readonly-odontogram">${renderReadonlyOdontogram(patient.odontogram)}</div>`}
     </section>
 
     <section class="detail-card">
@@ -374,11 +460,14 @@ function renderPatientProfile(patientId) {
       <h2>Evolucion</h2>
       <form class="evolution-form detail-evolution-form">
         <div class="evolution-row">
-          <label>Fecha<input type="date" name="date" required value="${new Date().toISOString().slice(0, 10)}" /></label>
-          <label>Procedimientos<input name="procedure" placeholder="Ej. Profilaxis, Obturacion 26..." /></label>
+          <label>Fecha<input type="date" name="date" required value="${escapeHtml((editingEvolutionIndex != null ? patient.evolution[editingEvolutionIndex]?.date : null) || new Date().toISOString().slice(0, 10))}" /></label>
+          <label>Procedimientos<input name="procedure" placeholder="Ej. Profilaxis, Obturacion 26..." value="${escapeHtml(editingEvolutionIndex != null ? patient.evolution[editingEvolutionIndex]?.procedure || "" : "")}" /></label>
         </div>
-        <label>Notas / avances<textarea name="note" rows="3" required></textarea></label>
-        <button class="primary-button" type="submit">+ Anadir consulta</button>
+        <label>Notas / avances<textarea name="note" rows="3" required>${escapeHtml(editingEvolutionIndex != null ? patient.evolution[editingEvolutionIndex]?.note || "" : "")}</textarea></label>
+        <div class="actions">
+          <button type="button" class="ghost-button" id="cancelEvolutionEdit" ${editingEvolutionIndex != null ? "" : "hidden"}>Cancelar edición</button>
+          <button class="primary-button" type="submit" id="evolutionSubmit">${editingEvolutionIndex != null ? "Guardar cambios" : "+ Anadir consulta"}</button>
+        </div>
       </form>
       <div class="evolution-timeline">${evolution}</div>
     </section>
@@ -388,21 +477,112 @@ function renderPatientProfile(patientId) {
     document.getElementById("historyDetailView").hidden = true;
     document.getElementById("historyListView").hidden = false;
   });
+
+  document.getElementById("deletePatientButton").addEventListener("click", () => {
+    if (!window.confirm(`Eliminar a ${patient.name}? Esta accion no se puede deshacer y borrara todo su historial.`)) return;
+    state.patients = state.patients.filter((item) => item.id !== patient.id);
+    save(storageKeys.patients, state.patients);
+    document.getElementById("historyDetailView").hidden = true;
+    document.getElementById("historyListView").hidden = false;
+    renderPatientResults();
+    renderFinancePatients();
+  });
+
+  if (isEditingDetails) {
+    document.getElementById("cancelPatientEdit").addEventListener("click", () => renderPatientProfile(patient.id));
+    document.getElementById("patientEditForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const data = new FormData(event.currentTarget);
+      Object.assign(patient, {
+        name: String(data.get("name") || "").trim(),
+        age: data.get("age"),
+        birthDate: data.get("birthDate"),
+        idNumber: String(data.get("idNumber") || "").trim(),
+        phone: data.get("phone"),
+        secondaryPhone: data.get("secondaryPhone"),
+        bloodGroup: data.get("bloodGroup"),
+        address: data.get("address"),
+        app: data.get("app"),
+        apf: data.get("apf"),
+        ah: data.get("ah"),
+        rm: data.get("rm"),
+        habits: data.get("habits"),
+        oralExam: data.get("oralExam"),
+      });
+      save(storageKeys.patients, state.patients);
+      renderPatientResults();
+      renderFinancePatients();
+      renderPatientProfile(patient.id);
+      showStatus("Datos del paciente actualizados.");
+    });
+  } else {
+    document.getElementById("editPatientButton").addEventListener("click", () => renderPatientProfile(patient.id, { editingDetails: true }));
+  }
+
+  if (isEditingOdontogram) {
+    const editingMarks = structuredClone(patient.odontogram || {});
+    state.selectedTool = "paint";
+    state.selectedColor = "red";
+    renderOdontogramEditor("historyOdontogram", editingMarks);
+    bindOdontogramTools(profile);
+
+    document.getElementById("cancelOdontogramEdit").addEventListener("click", () => {
+      renderPatientProfile(patient.id, { editingDetails: isEditingDetails });
+    });
+    document.getElementById("saveOdontogramEdit").addEventListener("click", () => {
+      patient.odontogram = editingMarks;
+      save(storageKeys.patients, state.patients);
+      renderPatientProfile(patient.id, { editingDetails: isEditingDetails });
+      showStatus("Odontodiagrama actualizado.");
+    });
+  } else {
+    document.getElementById("editOdontogramButton").addEventListener("click", () => renderPatientProfile(patient.id, { editingDetails: isEditingDetails, editingOdontogram: true }));
+  }
+
   bindTreatmentPlanEditor(profile, patient);
 
 
   profile.querySelector(".evolution-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    patient.evolution = patient.evolution || [];
-    patient.evolution.unshift({
+    const entry = {
       date: data.get("date"),
       procedure: data.get("procedure").trim(),
       note: data.get("note").trim(),
-    });
+    };
+    patient.evolution = patient.evolution || [];
+    if (editingEvolutionIndex != null && patient.evolution[editingEvolutionIndex]) {
+      patient.evolution[editingEvolutionIndex] = entry;
+    } else {
+      patient.evolution.unshift(entry);
+    }
     save(storageKeys.patients, state.patients);
-    renderPatientProfile(patient.id);
+    renderPatientProfile(patient.id, { editingDetails: isEditingDetails, editingOdontogram: isEditingOdontogram });
     renderPatientResults();
+  });
+
+  if (editingEvolutionIndex != null) {
+    document.getElementById("cancelEvolutionEdit").addEventListener("click", () => {
+      renderPatientProfile(patient.id, { editingDetails: isEditingDetails, editingOdontogram: isEditingOdontogram });
+    });
+  }
+
+  profile.querySelector(".evolution-timeline").addEventListener("click", (event) => {
+    const editButton = event.target.closest("[data-edit-evolution]");
+    const deleteButton = event.target.closest("[data-delete-evolution]");
+    if (editButton) {
+      renderPatientProfile(patient.id, { editingDetails: isEditingDetails, editingOdontogram: isEditingOdontogram, editingEvolutionIndex: Number(editButton.dataset.editEvolution) });
+      return;
+    }
+    if (deleteButton) {
+      const index = Number(deleteButton.dataset.deleteEvolution);
+      const entry = patient.evolution[index];
+      if (!entry) return;
+      if (!window.confirm("Eliminar esta consulta del historial? Esta accion no se puede deshacer.")) return;
+      patient.evolution.splice(index, 1);
+      save(storageKeys.patients, state.patients);
+      renderPatientProfile(patient.id, { editingDetails: isEditingDetails, editingOdontogram: isEditingOdontogram });
+    }
   });
 }
 
@@ -489,6 +669,41 @@ function bindTreatmentPlanEditor(profile, patient) {
 
 function detailField(label, value) {
   return `<div><span>${label}</span><strong>${escapeHtml(value || "No registrado")}</strong></div>`;
+}
+
+function renderPatientEditForm(patient) {
+  const bloodGroups = ["O+", "O-", "A+", "A-", "B+", "B-", "AB+", "AB-"];
+  return `
+    <form class="patient-edit-form" id="patientEditForm">
+      <div class="grid two">
+        <label>Nombre Completo<input name="name" value="${escapeHtml(patient.name || "")}" required /></label>
+        <label>Edad<input name="age" type="number" min="0" value="${escapeHtml(patient.age || "")}" required /></label>
+        <label>Fecha de nacimiento<input name="birthDate" type="date" value="${escapeHtml(patient.birthDate || "")}" /></label>
+        <label>Cedula<input name="idNumber" value="${escapeHtml(patient.idNumber || "")}" required /></label>
+        <label>Telefono<input name="phone" value="${escapeHtml(patient.phone || "")}" /></label>
+        <label>Telefono auxiliar<input name="secondaryPhone" value="${escapeHtml(patient.secondaryPhone || "")}" /></label>
+        <label>Grupo sanguineo
+          <select name="bloodGroup">
+            <option value="">Selecciona un grupo sanguineo</option>
+            ${bloodGroups.map((group) => `<option value="${group}" ${patient.bloodGroup === group ? "selected" : ""}>${group}</option>`).join("")}
+          </select>
+        </label>
+        <label>Direccion<input name="address" value="${escapeHtml(patient.address || "")}" /></label>
+      </div>
+      <div class="grid antecedent-grid">
+        <label>APP (ANTECEDENTES PATOLOGICOS PERSONALES)<textarea name="app" rows="3">${escapeHtml(patient.app || "")}</textarea></label>
+        <label>APF (ANTECEDENTES PATOLOGICOS FAMILIARES)<textarea name="apf" rows="3">${escapeHtml(patient.apf || "")}</textarea></label>
+        <label>AH (ANTECEDENTES HEMORRAGICOS)<textarea name="ah" rows="3">${escapeHtml(patient.ah || "")}</textarea></label>
+        <label>RM (REACCION A MEDICAMENTOS)<textarea name="rm" rows="3">${escapeHtml(patient.rm || "")}</textarea></label>
+        <label class="wide">HABITOS<textarea name="habits" rows="3">${escapeHtml(patient.habits || "")}</textarea></label>
+        <label class="wide">EXAMEN BUCAL<textarea name="oralExam" rows="4">${escapeHtml(patient.oralExam || "")}</textarea></label>
+      </div>
+      <div class="actions">
+        <button type="button" class="ghost-button" id="cancelPatientEdit">Cancelar</button>
+        <button type="submit" class="primary-button">Guardar cambios</button>
+      </div>
+    </form>
+  `;
 }
 
 function renderReadonlyOdontogram(marks = {}) {
