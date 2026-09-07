@@ -1151,6 +1151,7 @@ function updatePercentageTotals() {
 
 function renderPercentageSummary(rows) {
   const body = document.getElementById("percentageRows");
+  body.querySelector(".percentage-grand-summary-row")?.remove();
   const tableRows = Array.from(body.querySelectorAll("tr[data-clinic]"));
 
   tableRows.forEach((row, index) => {
@@ -1158,6 +1159,25 @@ function renderPercentageSummary(rows) {
     const label = index === 0 ? "Total clinica" : "Total " + (item.name === "Sin nombre" ? index : item.name);
     row.querySelector(".percentage-row-total").innerHTML = renderInlinePercentageTotal(label, item.amount, item.amountVes, item.percentage || 0);
   });
+
+  const clinicRow = rows[0] || { amount: 0, amountVes: 0 };
+  const clinicResult = getClinicResultRow(rows);
+  const isVesMode = state.percentageCurrencyMode === "VES";
+  const clinicBase = isVesMode ? clinicRow.amountVes : clinicRow.amount;
+  const resultPercentage = clinicBase ? (isVesMode ? clinicResult.amountVes : clinicResult.amount) / clinicBase * 100 : 0;
+
+  const resultRow = document.createElement("tr");
+  resultRow.className = "percentage-grand-summary-row";
+  resultRow.innerHTML = '<td class="percentage-grand-label" colspan="2">Clinica resultado</td><td class="percentage-row-total grand">' + renderInlinePercentageTotal("Clinica resultado", clinicResult.amount, clinicResult.amountVes, resultPercentage) + '</td><td class="percentage-row-actions"><span class="not-applicable">-</span></td>';
+  body.appendChild(resultRow);
+}
+
+function getClinicResultRow(rows) {
+  const clinicRow = rows[0] || { amount: 0, amountVes: 0 };
+  const dentistRows = rows.slice(1);
+  const amount = clinicRow.amount - dentistRows.reduce((sum, row) => sum + row.amount, 0);
+  const amountVes = clinicRow.amountVes - dentistRows.reduce((sum, row) => sum + row.amountVes, 0);
+  return { name: "Clinica resultado", amount, amountVes };
 }
 
 function renderInlinePercentageTotal(label, amount, amountVes, percentage) {
@@ -1326,6 +1346,7 @@ function openMonthlyPercentageReport(monthKey) {
 
 function renderStructuredPercentageReport(rows, currencyMode) {
   const clinicRow = rows[0] || { amount: 0, amountVes: 0 };
+  const clinicResult = getClinicResultRow(rows);
   const amountHeader = currencyMode === "MIXED" ? "Ingresos USD / VES" : (currencyMode === "VES" ? "Ingreso VES" : "Ingreso USD");
 
   return `
@@ -1344,6 +1365,10 @@ function renderStructuredPercentageReport(rows, currencyMode) {
               <td class="structured-report-total-cell">${renderStructuredReportTotal(totalLabel, row.amount, row.amountVes, percentageText)}</td>
             </tr>`;
           }).join("")}
+          <tr class="structured-report-grand-row">
+            <td class="structured-report-grand-label" colspan="2">Clinica resultado</td>
+            <td class="structured-report-total-cell grand">${renderStructuredReportTotal("Clinica resultado", clinicResult.amount, clinicResult.amountVes, getStructuredReportPercentage(clinicResult, currencyMode, clinicRow))}</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -1411,6 +1436,13 @@ function exportReportToCsv() {
       csvEscape(percentageText),
     ].join(","));
   });
+  const clinicResult = getClinicResultRow(report.rows);
+  lines.push([
+    csvEscape("Clinica resultado"),
+    clinicResult.amount.toFixed(2),
+    clinicResult.amountVes.toFixed(2),
+    csvEscape(getStructuredReportPercentage(clinicResult, report.currencyMode, clinicRow)),
+  ].join(","));
   downloadBlob("﻿" + lines.join("\r\n"), `${report.filename}.csv`, "text/csv;charset=utf-8;");
 }
 
@@ -1428,6 +1460,13 @@ function exportReportToPdf() {
       <td>${escapeHtml(percentageText)}</td>
     </tr>`;
   }).join("");
+  const clinicResult = getClinicResultRow(report.rows);
+  const clinicResultHtml = `<tr>
+    <td><strong>Clinica resultado</strong></td>
+    <td><strong>${formatUsd(clinicResult.amount)}</strong></td>
+    <td><strong>${formatVes(clinicResult.amountVes)}</strong></td>
+    <td><strong>${escapeHtml(getStructuredReportPercentage(clinicResult, report.currencyMode, clinicRow))}</strong></td>
+  </tr>`;
 
   const printWindow = window.open("", "_blank", "width=900,height=700");
   if (!printWindow) {
@@ -1453,7 +1492,7 @@ function exportReportToPdf() {
   <p>${escapeHtml(report.subtitle)}</p>
   <table>
     <thead><tr><th>Beneficiario</th><th>Ingreso USD</th><th>Ingreso VES</th><th>Porcentaje</th></tr></thead>
-    <tbody>${rowsHtml}</tbody>
+    <tbody>${rowsHtml}${clinicResultHtml}</tbody>
   </table>
 </body>
 </html>`);
