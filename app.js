@@ -919,7 +919,7 @@ function getActiveDentistIds() {
 function renderDentistOptions(selectedId) {
   const options = getActiveDentists().map((dentist) => {
     const percentage = Number(dentist.percentage) || 0;
-    const label = `${dentist.name || dentist.id} (${percentage}%)`;
+    const label = `${dentist.name || dentist.id} (${percentage})`;
     const selected = dentist.id === selectedId ? " selected" : "";
     return `<option value="${escapeHtml(dentist.id)}"${selected}>${escapeHtml(label)}</option>`;
   }).join("");
@@ -1181,7 +1181,7 @@ function getClinicResultRow(rows) {
 }
 
 function renderInlinePercentageTotal(label, amount, amountVes, percentage) {
-  return '<div class="percentage-inline-total"><div><strong>' + escapeHtml(label) + '</strong><b>' + percentage.toFixed(2) + '%</b></div><span>' + formatUsd(amount) + ' / ' + formatVes(amountVes) + '</span></div>';
+  return '<div class="percentage-inline-total"><div><strong>' + escapeHtml(label) + '</strong><b>' + percentage.toFixed(2) + '</b></div><span>' + formatUsd(amount) + ' / ' + formatVes(amountVes) + '</span></div>';
 }
 
 function setPercentageMessage(message, isError = false) {
@@ -1400,13 +1400,13 @@ function renderReportPrimaryAmount(row, currencyMode) {
 function getStructuredReportPercentage(row, currencyMode, clinicRow) {
   if (currencyMode === "MIXED") {
     const percentages = [];
-    if (clinicRow.amount) percentages.push(`USD ${(row.amount / clinicRow.amount * 100).toFixed(2)}%`);
-    if (clinicRow.amountVes) percentages.push(`VES ${(row.amountVes / clinicRow.amountVes * 100).toFixed(2)}%`);
-    return percentages.length ? percentages.join(" ? ") : "0.00%";
+    if (clinicRow.amount) percentages.push(`USD ${(row.amount / clinicRow.amount * 100).toFixed(2)}`);
+    if (clinicRow.amountVes) percentages.push(`VES ${(row.amountVes / clinicRow.amountVes * 100).toFixed(2)}`);
+    return percentages.length ? percentages.join(" ? ") : "0.00";
   }
   const total = currencyMode === "VES" ? clinicRow.amountVes : clinicRow.amount;
   const amount = currencyMode === "VES" ? row.amountVes : row.amount;
-  return `${(total ? amount / total * 100 : 0).toFixed(2)}%`;
+  return `${(total ? amount / total * 100 : 0).toFixed(2)}`;
 }
 
 function renderStructuredReportTotal(label, amount, amountVes, percentageText) {
@@ -1625,7 +1625,7 @@ function renderDentists() {
     card.className = "dentist-card";
     card.dataset.dentistId = dentist.id;
     const isActive = dentist.status === "active";
-    card.innerHTML = '<div class="dentist-card-main"><strong>' + escapeHtml(dentist.name) + '</strong><span>ID: ' + escapeHtml(dentist.id) + '</span></div><span class="dentist-percentage">' + (dentist.percentage ?? 0) + '%</span><span class="dentist-status ' + (isActive ? "active" : "inactive") + '">' + (isActive ? "Activa" : "Inactiva") + '</span><div class="dentist-card-actions"><button type="button" class="ghost-button" data-dentist-action="edit">Editar</button><button type="button" class="danger-button" data-dentist-action="delete">Eliminar</button></div>';
+    card.innerHTML = '<div class="dentist-card-main"><strong>' + escapeHtml(dentist.name) + '</strong><span>ID: ' + escapeHtml(dentist.id) + '</span></div><span class="dentist-percentage">' + (dentist.percentage ?? 0) + '</span><span class="dentist-status ' + (isActive ? "active" : "inactive") + '">' + (isActive ? "Activa" : "Inactiva") + '</span><div class="dentist-card-actions"><button type="button" class="ghost-button" data-dentist-action="edit">Editar</button><button type="button" class="danger-button" data-dentist-action="delete">Eliminar</button></div>';
     list.appendChild(card);
   });
 }
