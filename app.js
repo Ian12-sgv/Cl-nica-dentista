@@ -57,6 +57,7 @@ const views = {
 const supabaseUrl = "https://lydduhkwbdrprxucjsiq.supabase.co";
 const supabaseKey = "sb_publishable_i-iUJZcjvDscaiKm-r5WQQ_vM_mSY8G";
 const db = window.supabase.createClient(supabaseUrl, supabaseKey);
+const loginEmailDomain = "consultorio.app";
 
 const remoteTables = {
   [storageKeys.patients]: { table: "patients", stateKey: "patients" },
@@ -86,13 +87,15 @@ function bindLogin() {
     const button = form.querySelector("button[type='submit']");
     button.disabled = true;
     setLoginMessage("Entrando...");
+    // Supabase exige correo: el nombre se convierte en <nombre>@consultorio.app.
+    const username = form.elements.username.value.trim().toLowerCase();
     const { error } = await db.auth.signInWithPassword({
-      email: form.elements.email.value.trim(),
+      email: username + "@" + loginEmailDomain,
       password: form.elements.password.value,
     });
     button.disabled = false;
     if (error) {
-      setLoginMessage("Correo o contrasena incorrectos.", true);
+      setLoginMessage("Nombre o contrasena incorrectos.", true);
       return;
     }
     form.reset();
