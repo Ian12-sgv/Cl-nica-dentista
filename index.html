@@ -4,10 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Consultorio Dental</title>
-    <link rel="stylesheet" href="styles.css?v=20260809-16" />
+    <link rel="stylesheet" href="styles.css?v=20261023-1" />
   </head>
   <body>
-    <div class="app-shell" id="appShell" data-view="registro">
+    <section class="login-screen" id="loginScreen">
+      <div class="login-card">
+        <div class="brand">
+          <span class="brand-mark">D</span>
+          <strong>Consultorio Dental</strong>
+        </div>
+        <form id="loginForm" hidden>
+          <p class="login-hint">Solo se pide una vez en este equipo.</p>
+          <label>Correo<input name="email" type="email" autocomplete="username" required /></label>
+          <label>Contrasena<input name="password" type="password" autocomplete="current-password" required /></label>
+          <button type="submit" class="primary-button">Entrar</button>
+        </form>
+        <p class="login-message" id="loginMessage" role="status"></p>
+        <button type="button" class="ghost-button" id="retryLoad" hidden>Reintentar</button>
+      </div>
+    </section>
+
+    <p class="sync-status" id="syncStatus" role="alert" hidden></p>
+
+    <div class="app-shell" id="appShell" data-view="registro" hidden>
       <header class="navbar">
         <div class="brand">
           <span class="brand-mark">D</span>
@@ -22,6 +41,7 @@
           <button class="nav-link" data-view="odontologas">Odontologas</button>
           <button class="nav-link" data-view="balance">Balance</button>
           <button class="nav-link" data-view="porcentajes">Porcentajes</button>
+          <button type="button" class="logout-link" id="logoutButton">Salir</button>
         </nav>
       </header>
 
@@ -349,7 +369,8 @@
       </section>
     </div>
 
-    <script src="app.js?v=20261023-1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js"></script>
+    <script src="app.js?v=20261023-2"></script>
   </body>
 </html>
 

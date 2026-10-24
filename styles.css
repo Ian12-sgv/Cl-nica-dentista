@@ -2425,3 +2425,84 @@ textarea:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.app-shell[hidden],
+.login-screen[hidden],
+.login-card form[hidden],
+.sync-status[hidden] {
+  display: none;
+}
+
+.login-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.login-card {
+  width: min(360px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.login-card form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-card label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.login-hint,
+.login-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.login-message:empty {
+  display: none;
+}
+
+.login-message.error {
+  color: var(--danger);
+}
+
+.logout-link {
+  border: 0;
+  background: transparent;
+  padding: 4px 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.logout-link:hover {
+  color: var(--danger);
+}
+
+.sync-status {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  margin: 0 auto;
+  max-width: 560px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: #fef3f2;
+  border: 1px solid #fecdca;
+  color: var(--danger);
+  font-size: 0.85rem;
+}

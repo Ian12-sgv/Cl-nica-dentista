@@ -54,7 +54,152 @@ const views = {
   porcentajes: "Porcentajes",
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+const supabaseUrl = "https://lydduhkwbdrprxucjsiq.supabase.co";
+const supabaseKey = "sb_publishable_i-iUJZcjvDscaiKm-r5WQQ_vM_mSY8G";
+const db = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+const remoteTables = {
+  [storageKeys.patients]: { table: "patients", stateKey: "patients" },
+  [storageKeys.finances]: { table: "finances", stateKey: "finances" },
+  [storageKeys.percentages]: { table: "percentages", stateKey: "percentages" },
+  [storageKeys.dentists]: { table: "dentists", stateKey: "dentists" },
+};
+
+// Ultima version guardada en Supabase de cada registro (id -> JSON), para enviar solo lo que cambia.
+const remoteSnapshots = {};
+const syncQueues = {};
+
+document.addEventListener("DOMContentLoaded", async () => {
+  bindLogin();
+  const { data } = await db.auth.getSession();
+  if (data.session) {
+    await loadRemoteAndStart();
+  } else {
+    showLogin();
+  }
+});
+
+function bindLogin() {
+  const form = document.getElementById("loginForm");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = form.querySelector("button[type='submit']");
+    button.disabled = true;
+    setLoginMessage("Entrando...");
+    const { error } = await db.auth.signInWithPassword({
+      email: form.elements.email.value.trim(),
+      password: form.elements.password.value,
+    });
+    button.disabled = false;
+    if (error) {
+      setLoginMessage("Correo o contrasena incorrectos.", true);
+      return;
+    }
+    form.reset();
+    await loadRemoteAndStart();
+  });
+
+  document.getElementById("logoutButton").addEventListener("click", async () => {
+    if (!window.confirm("Cerrar sesion en este equipo? Tendras que volver a escribir la contrasena.")) return;
+    await db.auth.signOut();
+    window.location.reload();
+  });
+
+  document.getElementById("retryLoad").addEventListener("click", loadRemoteAndStart);
+}
+
+function showLogin() {
+  document.getElementById("loginScreen").hidden = false;
+  document.getElementById("appShell").hidden = true;
+  document.getElementById("loginForm").hidden = false;
+  document.getElementById("retryLoad").hidden = true;
+  setLoginMessage("");
+}
+
+function setLoginMessage(text, isError = false) {
+  const message = document.getElementById("loginMessage");
+  message.textContent = text;
+  message.classList.toggle("error", isError);
+}
+
+async function loadRemoteAndStart() {
+  document.getElementById("loginScreen").hidden = false;
+  document.getElementById("loginForm").hidden = true;
+  document.getElementById("retryLoad").hidden = true;
+  setLoginMessage("Cargando datos...");
+
+  try {
+    const remote = {};
+    for (const { table } of Object.values(remoteTables)) {
+      remote[table] = await fetchAllRows(table);
+    }
+
+    const remoteIsEmpty = Object.values(remote).every((rows) => rows.length === 0);
+    const localHasData = Object.values(remoteTables).some(({ stateKey }) => state[stateKey].length > 0);
+    if (remoteIsEmpty && localHasData && window.confirm("Este equipo tiene datos guardados que aun no estan en la nube. Subirlos ahora?")) {
+      setLoginMessage("Subiendo datos existentes...");
+      await uploadLocalData();
+    } else {
+      if (remoteIsEmpty && localHasData) {
+        const backup = Object.fromEntries(Object.keys(remoteTables).map((storageKey) => [storageKey, localStorage.getItem(storageKey)]));
+        localStorage.setItem("dentalSpaLocalBackup", JSON.stringify(backup));
+      }
+      for (const [storageKey, { table, stateKey }] of Object.entries(remoteTables)) {
+        state[stateKey] = remote[table].map((row) => row.data);
+        remoteSnapshots[table] = new Map(remote[table].map((row) => [row.id, JSON.stringify(row.data)]));
+        localStorage.setItem(storageKey, JSON.stringify(state[stateKey]));
+      }
+    }
+  } catch (error) {
+    console.error(error);
+    setLoginMessage("No se pudo conectar con la base de datos. Revisa la conexion a internet.", true);
+    document.getElementById("retryLoad").hidden = false;
+    return;
+  }
+
+  document.getElementById("loginScreen").hidden = true;
+  document.getElementById("appShell").hidden = false;
+  startApp();
+}
+
+async function fetchAllRows(table) {
+  const pageSize = 1000;
+  const rows = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await db
+      .from(table)
+      .select("id, data")
+      .order("updated_at", { ascending: false })
+      .order("id")
+      .range(from, from + pageSize - 1);
+    if (error) throw error;
+    rows.push(...data);
+    if (data.length < pageSize) return rows;
+  }
+}
+
+async function uploadLocalData() {
+  const now = Date.now();
+  for (const { table, stateKey } of Object.values(remoteTables)) {
+    const items = state[stateKey];
+    items.forEach((item) => {
+      if (!item.id) item.id = crypto.randomUUID();
+    });
+    // updated_at decreciente para conservar el orden actual (lo mas reciente primero).
+    const rows = items.map((item, index) => ({
+      id: String(item.id),
+      data: item,
+      updated_at: new Date(now - index * 1000).toISOString(),
+    }));
+    for (let start = 0; start < rows.length; start += 500) {
+      const { error } = await db.from(table).upsert(rows.slice(start, start + 500));
+      if (error) throw error;
+    }
+    remoteSnapshots[table] = new Map(rows.map((row) => [row.id, JSON.stringify(row.data)]));
+  }
+}
+
+function startApp() {
   setTodayDefaults();
   bindNavigation();
   bindPatientForm();
@@ -71,7 +216,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderFinance();
   renderPercentageRows();
   renderSavedPercentages();
-});
+}
 
 function load(key, fallback) {
   try {
@@ -82,7 +227,52 @@ function load(key, fallback) {
 }
 
 function save(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  const json = JSON.stringify(value);
+  localStorage.setItem(key, json);
+  const { table } = remoteTables[key];
+  const items = JSON.parse(json);
+  syncQueues[table] = (syncQueues[table] || Promise.resolve())
+    .then(() => syncTable(table, items))
+    .then(() => setSyncStatus(""))
+    .catch((error) => {
+      console.error(error);
+      setSyncStatus("Sin conexion: los ultimos cambios no se guardaron en la nube. Se reintentara al guardar de nuevo.");
+    });
+}
+
+async function syncTable(table, items) {
+  const synced = remoteSnapshots[table] || new Map();
+  const current = new Map(items.map((item) => [String(item.id), JSON.stringify(item)]));
+  const created = [];
+  const changed = [];
+  const createdAt = new Date().toISOString();
+
+  for (const [id, json] of current) {
+    if (!synced.has(id)) created.push({ id, data: JSON.parse(json), updated_at: createdAt });
+    else if (synced.get(id) !== json) changed.push({ id, data: JSON.parse(json) });
+  }
+  const removed = Array.from(synced.keys()).filter((id) => !current.has(id));
+
+  // updated_at solo se fija al crear, asi el orden de carga se mantiene al editar.
+  if (created.length) {
+    const { error } = await db.from(table).upsert(created);
+    if (error) throw error;
+  }
+  if (changed.length) {
+    const { error } = await db.from(table).upsert(changed);
+    if (error) throw error;
+  }
+  if (removed.length) {
+    const { error } = await db.from(table).delete().in("id", removed);
+    if (error) throw error;
+  }
+  remoteSnapshots[table] = current;
+}
+
+function setSyncStatus(text) {
+  const status = document.getElementById("syncStatus");
+  status.textContent = text;
+  status.hidden = !text;
 }
 
 function setTodayDefaults() {
